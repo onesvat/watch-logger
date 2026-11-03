@@ -68,7 +68,7 @@ export function readWatch(full: Gray, opts: ReadOptions): WatchReading {
   lap('ring');
   const dial = fitDial(full, scaleRing(ring, fr));
   const radiusPx = ring.a * fr;
-  if (radiusPx < 250) warnings.push(`Dial is small (${Math.round(radiusPx)} px) — shoot closer`);
+  if (radiusPx < 150) warnings.push(`Dial is small (${Math.round(radiusPx)} px) — shoot closer`);
   lap('homography');
   const R = { img: blur(rectify(full, dial.H, 1200, 1.1), 0.8), extent: 1.1 };
   lap('rectify');
