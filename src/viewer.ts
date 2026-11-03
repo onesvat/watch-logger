@@ -30,6 +30,10 @@ export class Viewer {
     this.draw();
   }
 
+  redraw() {
+    this.draw();
+  }
+
   setImage(img: ImageBitmap) {
     this.img = img;
     this.overlay = null;

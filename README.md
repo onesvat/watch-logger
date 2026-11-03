@@ -45,8 +45,9 @@ and logs the drift.
    so under projection it maps to the dial by a homothety — **its direction is unaffected by parallax**.
 
 On 6 sample photos taken within 10 s the drift was −15.24 s with a std of 0.14 s; the fractional seconds
-read land within ~±0.05 s of the 1/8 s steps of a 28,800 vph movement. When confidence is low or there is a
-warning, the measurement is not saved automatically.
+read land within ~±0.05 s of the 1/8 s steps of a 28,800 vph movement. A measurement is never saved without
+confirmation: the hour, minute and seconds hands for the time in the input are drawn over the photo (they follow
+manual edits), so the reading can be checked against the real hands before tapping *Save*.
 
 ## Development
 

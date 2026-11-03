@@ -44,10 +44,9 @@ let sync: SyncResult | null = null;
 let syncing: Promise<SyncResult | null> | null = null;
 let latencyMs = 0;
 let calibMode = false;
-let autoSave = true;
 let datePosition = 3;
 let pendingReset = false; // watch was just set → next measurement starts a new series
-const AUTO_SAVE_MIN_CONF = 0.75;
+const GOOD_CONF = 0.75; // below this the auto-read is flagged as uncertain
 
 interface Entry {
   mode: 'new' | 'calib' | 'edit';
@@ -306,11 +305,15 @@ function setAutoStatus(state: { kind: 'busy' | 'ok' | 'warn' | 'err'; html: stri
 }
 
 function showAuto(r: AutoResult) {
-  viewer.setOverlay((ctx, px) => drawOverlay(ctx, r.overlay, px));
+  // The hands are drawn for whatever is in the input, so manual edits move them.
+  viewer.setOverlay((ctx, px) => {
+    const tod = parseTimeOfDay(watchInput.value);
+    drawOverlay(ctx, r.overlay, px, tod === null ? null : tod / 1000);
+  });
   const conf = Math.round(r.confidence * 100);
   const warn = r.warnings.length ? ` · ${r.warnings.map(escapeHtml).join(', ')}` : '';
   setAutoStatus({
-    kind: r.warnings.length || r.confidence < AUTO_SAVE_MIN_CONF ? 'warn' : 'ok',
+    kind: r.warnings.length || r.confidence < GOOD_CONF ? 'warn' : 'ok',
     html: `Auto: <b>${fmtTod(r.todSeconds * 1000, 2)}</b> · confidence ${conf}%${warn}`,
   });
 }
@@ -329,9 +332,6 @@ async function runAuto(e: Entry, bitmap: ImageBitmap) {
     watchInput.value = e.autoText;
     showAuto(r);
     updateEntry();
-    if (autoSave && e.mode === 'new' && r.confidence >= AUTO_SAVE_MIN_CONF && r.warnings.length === 0) {
-      await saveEntry(true);
-    }
   } catch (err) {
     if (entry === e) setAutoStatus({ kind: 'err', html: `Automatic reading failed: ${escapeHtml((err as Error).message)}. Enter the value manually.` });
   }
@@ -355,6 +355,7 @@ function updateEntry() {
 
   const w = currentWatch();
   watchInput.classList.toggle('invalid', !w);
+  if (entry.auto) viewer.redraw();
   const out = $('drift-out');
   if (!w) {
     out.textContent = 'Format: hh:mm:ss.f (e.g. 12:48:41.8)';
@@ -393,9 +394,9 @@ $('entry-cancel').addEventListener('click', () => {
   location.hash = back;
 });
 
-$('entry-save').addEventListener('click', () => void saveEntry(false));
+$('entry-save').addEventListener('click', () => void saveEntry());
 
-async function saveEntry(automatic: boolean) {
+async function saveEntry() {
   if (!entry) return;
   const w = currentWatch();
   if (!w) return toast('Invalid time format.');
@@ -441,7 +442,7 @@ async function saveEntry(automatic: boolean) {
     await kvSet('pendingReset', false);
   }
   entry = null;
-  toast(`${automatic ? 'Saved automatically' : 'Saved'}: ${fmtSigned(m.drift, 2, ' s')}`, automatic ? 4000 : 3000);
+  toast(`Saved: ${fmtSigned(m.drift, 2, ' s')}`);
   location.hash = 'history';
 }
 
@@ -535,7 +536,6 @@ $('list').addEventListener('click', async (ev) => {
 
 async function renderSettings() {
   renderSync(sync ? 'ok' : 'err');
-  $<HTMLInputElement>('autosave-input').checked = autoSave;
   $<HTMLInputElement>('datepos-input').value = String(datePosition);
   $<HTMLInputElement>('latency-input').value = latencyMs.toFixed(0);
   const samples = (await kvGet<LatencySample[]>('latencySamples')) ?? [];
@@ -545,10 +545,6 @@ async function renderSettings() {
 }
 
 $('sync-now').addEventListener('click', () => void doSync());
-$<HTMLInputElement>('autosave-input').addEventListener('change', async (ev) => {
-  autoSave = (ev.target as HTMLInputElement).checked;
-  await kvSet('autoSave', autoSave);
-});
 $<HTMLInputElement>('datepos-input').addEventListener('change', async (ev) => {
   const v = Math.round(Number((ev.target as HTMLInputElement).value));
   if (!(v >= 1 && v <= 12)) return;
@@ -758,7 +754,6 @@ document.addEventListener('visibilitychange', () => {
 (async () => {
   sync = (await kvGet<SyncResult>('lastSync')) ?? null;
   latencyMs = (await kvGet<number>('latencyMs')) ?? 0;
-  autoSave = (await kvGet<boolean>('autoSave')) ?? true;
   datePosition = (await kvGet<number>('datePosition')) ?? 3;
   pendingReset = (await kvGet<boolean>('pendingReset')) ?? false;
   renderSync(sync ? 'ok' : 'err');

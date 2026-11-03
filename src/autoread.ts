@@ -42,8 +42,11 @@ export function autoRead(
   });
 }
 
-/** Overlay in image coordinates: minute ring, 12 direction, hand lines. `px` = 1 screen pixel. */
-export function drawOverlay(ctx: CanvasRenderingContext2D, o: AutoOverlay, px: number) {
+/**
+ * Overlay in image coordinates: minute ring, 12 direction and the three hands for `todSeconds`
+ * (the time currently in the input, so the drawing follows manual edits). `px` = 1 screen pixel.
+ */
+export function drawOverlay(ctx: CanvasRenderingContext2D, o: AutoOverlay, px: number, todSeconds: number | null) {
   const P = (u: number, v: number) => applyH(o.H, u, v);
   const poly = (pts: [number, number][], color: string, width: number) => {
     ctx.beginPath();
@@ -54,6 +57,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, o: AutoOverlay, px: n
   };
   ctx.save();
   ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   // Circle through the inner ends of the minute ticks
   poly(
     [...Array(241).keys()].map((i) => P(Math.cos((i / 240) * 2 * Math.PI), Math.sin((i / 240) * 2 * Math.PI))),
@@ -64,14 +68,26 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, o: AutoOverlay, px: n
   const c12 = Math.cos(o.theta12);
   const s12 = Math.sin(o.theta12);
   poly([P(0.9 * c12, 0.9 * s12), P(1.08 * c12, 1.08 * s12)], '#d9a441', 4);
-  for (const l of o.lines) {
-    const ux = Math.cos(l.phi);
-    const uy = Math.sin(l.phi);
-    const nx = -uy;
-    const ny = ux;
-    const at = (s: number) => P(l.d * nx + s * ux, l.d * ny + s * uy);
-    if (l.name === 'sec*') poly([at(-0.25), at(0.95)], '#ff4d6d', 1.5);
-    else poly([at(0.1), at(l.name === 'hour' || l.name === 'akrep' ? 0.55 : 0.85)], 'rgba(255,255,255,0.55)', 2);
+
+  if (todSeconds !== null) {
+    // Dial angle grows clockwise from the 12 direction (same convention as the reader).
+    const t = ((todSeconds % 43200) + 43200) % 43200;
+    const hand = (frac: number, from: number, to: number, color: string, width: number) => {
+      const a = o.theta12 + frac * 2 * Math.PI;
+      const ux = Math.cos(a);
+      const uy = Math.sin(a);
+      const pts: [number, number][] = [P(from * ux, from * uy), P(to * ux, to * uy)];
+      poly(pts, 'rgba(0,0,0,0.6)', width + 2); // dark halo for contrast on any dial
+      poly(pts, color, width);
+    };
+    hand(t / 43200, -0.08, 0.55, 'rgba(255,255,255,0.85)', 5); // hour
+    hand((t % 3600) / 3600, -0.1, 0.88, 'rgba(255,255,255,0.85)', 3.5); // minute
+    hand((t % 60) / 60, -0.25, 0.97, '#ff4d6d', 1.5); // seconds
+    const [cx, cy] = P(0, 0);
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4 * px, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ff4d6d';
+    ctx.fill();
   }
   ctx.restore();
 }
