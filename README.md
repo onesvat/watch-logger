@@ -47,7 +47,8 @@ and logs the drift.
 On 6 sample photos taken within 10 s the drift was −15.24 s with a std of 0.14 s; the fractional seconds
 read land within ~±0.05 s of the 1/8 s steps of a 28,800 vph movement. A measurement is never saved without
 confirmation: the hour, minute and seconds hands for the time in the input are drawn over the photo (they follow
-manual edits), so the reading can be checked against the real hands before tapping *Save*.
+manual edits), so the reading can be checked against the real hands before tapping *Save*. If the dial is not
+found, the hands are drawn on a placeholder dial centred on the photo, starting at true time.
 
 ## Development
 

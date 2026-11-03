@@ -16,7 +16,7 @@ import {
   type Source,
 } from './db';
 import { autoRead, drawOverlay } from './autoread';
-import type { AutoResult } from './cv/protocol';
+import type { AutoOverlay, AutoResult } from './cv/protocol';
 import { decodeImage } from './decode';
 import { readExifTime } from './exif';
 import {
@@ -280,6 +280,7 @@ async function openEntry(e: Entry, prefillWatch?: number) {
     e.autoText = fmtTod(e.auto.todSeconds * 1000, 2);
     showAuto(e.auto);
   } else if (bitmap) {
+    showHands(defaultOverlay(bitmap.width, bitmap.height));
     void runAuto(e, bitmap);
   }
 }
@@ -304,12 +305,22 @@ function setAutoStatus(state: { kind: 'busy' | 'ok' | 'warn' | 'err'; html: stri
   el.innerHTML = (state.kind === 'busy' ? '<span class="spin"></span>' : '') + state.html;
 }
 
-function showAuto(r: AutoResult) {
-  // The hands are drawn for whatever is in the input, so manual edits move them.
+/** Hands drawn for whatever is in the input, so manual edits move them. */
+function showHands(o: AutoOverlay) {
   viewer.setOverlay((ctx, px) => {
     const tod = parseTimeOfDay(watchInput.value);
-    drawOverlay(ctx, r.overlay, px, tod === null ? null : tod / 1000);
+    drawOverlay(ctx, o, px, tod === null ? null : tod / 1000);
   });
+}
+
+/** Dial placeholder centred on the photo, 12 at the top: used until (or if) the auto-read locates the dial. */
+function defaultOverlay(w: number, h: number): AutoOverlay {
+  const r = 0.4 * Math.min(w, h);
+  return { H: [r, 0, w / 2, 0, r, h / 2, 0, 0, 1], theta12: -Math.PI / 2, lines: [] };
+}
+
+function showAuto(r: AutoResult) {
+  showHands(r.overlay);
   const conf = Math.round(r.confidence * 100);
   const warn = r.warnings.length ? ` · ${r.warnings.map(escapeHtml).join(', ')}` : '';
   setAutoStatus({
@@ -333,7 +344,7 @@ async function runAuto(e: Entry, bitmap: ImageBitmap) {
     showAuto(r);
     updateEntry();
   } catch (err) {
-    if (entry === e) setAutoStatus({ kind: 'err', html: `Automatic reading failed: ${escapeHtml((err as Error).message)}. Enter the value manually.` });
+    if (entry === e) setAutoStatus({ kind: 'err', html: `Automatic reading failed: ${escapeHtml((err as Error).message)}. Adjust the time until the drawn hands match the watch.` });
   }
 }
 
@@ -355,7 +366,7 @@ function updateEntry() {
 
   const w = currentWatch();
   watchInput.classList.toggle('invalid', !w);
-  if (entry.auto) viewer.redraw();
+  viewer.redraw();
   const out = $('drift-out');
   if (!w) {
     out.textContent = 'Format: hh:mm:ss.f (e.g. 12:48:41.8)';
