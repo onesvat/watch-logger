@@ -52,7 +52,7 @@ export function fmtTimeRounded(ms: number): string {
 
 export function fmtDate(ms: number): string {
   const d = new Date(ms);
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function fmtSigned(v: number, digits = 1, unit = ''): string {

@@ -5,7 +5,7 @@ import type { Measurement } from '../src/db';
 const m: Measurement = {
   id: 'a1', createdAt: 0, source: 'camera', tDevice: 1790761793000, offsetMs: -37, offsetErrMs: 12,
   latencyMs: 40, tTrue: 1790761792923, watchTime: 1790761795323, drift: 2.4, imgW: 1, imgH: 1,
-  note: 'gece, "kurmalı", masada', reset: true,
+  note: 'overnight, "dial up", café', reset: true,
 };
 
 describe('csv', () => {

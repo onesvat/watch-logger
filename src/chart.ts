@@ -18,7 +18,7 @@ function niceStep(range: number, count: number): number {
 export function renderChart(el: HTMLElement, samples: Sample[], fit: Fit | null) {
   el.innerHTML = '';
   if (samples.length === 0) {
-    el.innerHTML = '<p class="muted small">Henüz ölçüm yok.</p>';
+    el.innerHTML = '<p class="muted small">No measurements yet.</p>';
     return;
   }
   const t0 = samples[0].tTrue;
@@ -40,7 +40,7 @@ export function renderChart(el: HTMLElement, samples: Sample[], fit: Fit | null)
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', 'Sapmanın zamana göre değişimi');
+  svg.setAttribute('aria-label', 'Drift over time');
   const add = (tag: string, attrs: Record<string, string | number>, text?: string) => {
     const e = document.createElementNS(ns, tag);
     for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));

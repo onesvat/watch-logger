@@ -91,21 +91,21 @@ function renderSync(state: 'busy' | 'ok' | 'err') {
   const b = $('sync-badge');
   b.className = 'badge';
   if (state === 'busy') {
-    b.textContent = 'senkron…';
+    b.textContent = 'syncing…';
     return;
   }
   if (state === 'err' || !sync) {
     b.classList.add('err');
-    b.textContent = sync ? `eski senkron` : 'senkron yok';
+    b.textContent = sync ? 'stale sync' : 'no sync';
   } else {
     b.classList.add(sync.errMs < 50 ? 'ok' : 'warn');
     // offset = true − device → device is ahead of true time by −offset
-    b.textContent = `Telefon ${fmtSigned(-sync.offsetMs, 0)} ms ±${Math.ceil(sync.errMs)}`;
+    b.textContent = `Phone ${fmtSigned(-sync.offsetMs, 0)} ms ±${Math.ceil(sync.errMs)}`;
   }
   $('sync-detail').textContent = sync
-    ? `Cihaz saati gerçek zamandan ${fmtSigned(-sync.offsetMs, 0)} ms farklı (±${Math.ceil(sync.errMs)} ms, ` +
-      `${sync.samples} örnek, ${sync.server}). Son ölçüm: ${fmtTime(sync.at, 0)}.`
-    : 'Henüz senkron yapılmadı.';
+    ? `Device clock differs from true time by ${fmtSigned(-sync.offsetMs, 0)} ms (±${Math.ceil(sync.errMs)} ms, ` +
+      `${sync.samples} samples, ${sync.server}). Last sync: ${fmtTime(sync.at, 0)}.`
+    : 'Not synced yet.';
 }
 
 function doSync(): Promise<SyncResult | null> {
@@ -118,7 +118,7 @@ function doSync(): Promise<SyncResult | null> {
       return sync;
     } catch (e) {
       renderSync('err');
-      toast(`Senkron başarısız: ${trMessage((e as Error).message)}`);
+      toast(`Sync failed: ${(e as Error).message}`);
       return null;
     } finally {
       syncing = null;
@@ -177,8 +177,8 @@ async function openMeasure() {
   } catch (e) {
     msg.hidden = false;
     msg.textContent = window.isSecureContext
-      ? `Kamera açılamadı: ${(e as Error).message}`
-      : 'Kamera için HTTPS gerekli.';
+      ? `Could not open the camera: ${(e as Error).message}`
+      : 'The camera requires HTTPS.';
   }
 }
 
@@ -189,7 +189,7 @@ $('shutter').addEventListener('click', async () => {
   try {
     const cap = await captureFrame(video);
     const s = await freshSync();
-    if (!s) toast('Senkron yok: cihaz saati düzeltilmeden kullanılıyor.', 4000);
+    if (!s) toast('No sync: using the uncorrected device clock.', 4000);
     await openEntry({
       mode: calibMode ? 'calib' : 'new',
       source: 'camera',
@@ -202,7 +202,7 @@ $('shutter').addEventListener('click', async () => {
       latencyMs: calibMode ? 0 : latencyMs,
     });
   } catch (e) {
-    toast(`Çekim başarısız: ${trMessage((e as Error).message)}`);
+    toast(`Capture failed: ${(e as Error).message}`);
   } finally {
     btn.disabled = false;
   }
@@ -215,8 +215,8 @@ $<HTMLInputElement>('file-input').addEventListener('change', async (ev) => {
   if (!file) return;
   try {
     const exif = await readExifTime(file);
-    if (!exif) toast('EXIF zamanı yok, dosya tarihi kullanılıyor.', 4000);
-    else if (!exif.hasSubSec) toast('EXIF alt-saniye bilgisi yok (±0,5 s).', 4000);
+    if (!exif) toast('No EXIF time, using the file date.', 4000);
+    else if (!exif.hasSubSec) toast('No EXIF sub-seconds (±0.5 s).', 4000);
     const lastSync = sync ?? (await kvGet<SyncResult>('lastSync')) ?? null;
     await openEntry({
       mode: 'new',
@@ -230,7 +230,7 @@ $<HTMLInputElement>('file-input').addEventListener('change', async (ev) => {
       latencyMs: 0,
     });
   } catch (e) {
-    toast(`Dosya açılamadı: ${(e as Error).message}`);
+    toast(`Could not open the file: ${(e as Error).message}`);
   }
 });
 
@@ -266,7 +266,7 @@ async function openEntry(e: Entry, prefillWatch?: number) {
   watchInput.value = fmtTod(pre - localMidnight(pre), 2);
 
   const isCalib = e.mode === 'calib';
-  $('entry-label').textContent = isCalib ? 'Fotoğraftaki referans saatin gösterdiği' : 'Saatin gösterdiği';
+  $('entry-label').textContent = isCalib ? 'Reference clock shown in the photo' : 'Watch shows';
   $('entry-extra').hidden = isCalib;
   $('upload-offset').hidden = e.source !== 'upload';
   offsetInput.value = String(Math.round(e.offsetMs) || 0);
@@ -285,38 +285,17 @@ async function openEntry(e: Entry, prefillWatch?: number) {
   }
 }
 
-const STAGE_TR: Record<string, string> = {
-  center: 'kadran aranıyor',
-  ring: 'dakika çizgileri',
-  homography: 'perspektif düzeltme',
-  rectify: 'perspektif düzeltme',
-  orientation: '12 yönü',
-  hands: 'akrep/yelkovan',
-  'seconds-search': 'saniye ibresi',
-  'seconds-refine': 'saniye ibresi (alt-piksel)',
+const STAGE_LABEL: Record<string, string> = {
+  center: 'finding the dial',
+  ring: 'minute ticks',
+  homography: 'perspective correction',
+  rectify: 'perspective correction',
+  orientation: '12 o\'clock direction',
+  hands: 'hour/minute hands',
+  'seconds-search': 'seconds hand',
+  'seconds-refine': 'seconds hand (sub-pixel)',
 };
 
-// Messages from the CV pipeline and helpers are English; the UI shows them in Turkish.
-const MESSAGE_TR: [RegExp, string][] = [
-  [/^Dial not found$/, 'Kadran bulunamadı'],
-  [/^Dial is small \((\d+) px\) — shoot closer$/, 'Kadran küçük ($1 px) — daha yakından çekin'],
-  [/^12 direction ambiguous$/, '12 yönü belirsiz'],
-  [/^Minute hand not found$/, 'Yelkovan bulunamadı'],
-  [/^Seconds hand not found$/, 'Saniye ibresi bulunamadı'],
-  [/^Seconds hand candidates are close$/, 'Saniye ibresi adayları yakın'],
-  [/^Minute\/seconds mismatch \((.+)\)$/, 'Yelkovan–saniye tutarsız ($1)'],
-  [/^Hour hand mismatch \((.+)\)$/, 'Akrep tutarsız ($1)'],
-  [/^Not enough minute ticks \((\d+)\)$/, 'Yetersiz dakika çizgisi ($1)'],
-  [/^singular system$/, 'tekil sistem'],
-  [/^Invalid server response: /, 'Geçersiz sunucu cevabı: '],
-  [/^Time server unreachable$/, 'Zaman sunucusuna ulaşılamadı'],
-  [/^toBlob failed$/, 'toBlob başarısız'],
-];
-
-function trMessage(msg: string): string {
-  for (const [re, tr] of MESSAGE_TR) if (re.test(msg)) return msg.replace(re, tr);
-  return msg;
-}
 
 function setAutoStatus(state: { kind: 'busy' | 'ok' | 'warn' | 'err'; html: string } | null) {
   const el = $('auto-status');
@@ -329,20 +308,20 @@ function setAutoStatus(state: { kind: 'busy' | 'ok' | 'warn' | 'err'; html: stri
 function showAuto(r: AutoResult) {
   viewer.setOverlay((ctx, px) => drawOverlay(ctx, r.overlay, px));
   const conf = Math.round(r.confidence * 100);
-  const warn = r.warnings.length ? ` · ${r.warnings.map((w) => escapeHtml(trMessage(w))).join(', ')}` : '';
+  const warn = r.warnings.length ? ` · ${r.warnings.map(escapeHtml).join(', ')}` : '';
   setAutoStatus({
     kind: r.warnings.length || r.confidence < AUTO_SAVE_MIN_CONF ? 'warn' : 'ok',
-    html: `Otomatik: <b>${fmtTod(r.todSeconds * 1000, 2)}</b> · güven %${conf}${warn}`,
+    html: `Auto: <b>${fmtTod(r.todSeconds * 1000, 2)}</b> · confidence ${conf}%${warn}`,
   });
 }
 
 async function runAuto(e: Entry, bitmap: ImageBitmap) {
   const tTrue = tTrueOf(e);
   const refTod = (tTrue - localMidnight(tTrue)) / 1000;
-  setAutoStatus({ kind: 'busy', html: 'Otomatik okunuyor…' });
+  setAutoStatus({ kind: 'busy', html: 'Reading automatically…' });
   try {
     const r = await autoRead(bitmap, refTod, datePosition, (stage) => {
-      if (entry === e) setAutoStatus({ kind: 'busy', html: `Otomatik okunuyor: ${STAGE_TR[stage] ?? stage}…` });
+      if (entry === e) setAutoStatus({ kind: 'busy', html: `Reading automatically: ${STAGE_LABEL[stage] ?? stage}…` });
     });
     if (entry !== e) return;
     e.auto = r;
@@ -354,7 +333,7 @@ async function runAuto(e: Entry, bitmap: ImageBitmap) {
       await saveEntry(true);
     }
   } catch (err) {
-    if (entry === e) setAutoStatus({ kind: 'err', html: `Otomatik okunamadı: ${escapeHtml(trMessage((err as Error).message))}. Değeri elle girin.` });
+    if (entry === e) setAutoStatus({ kind: 'err', html: `Automatic reading failed: ${escapeHtml((err as Error).message)}. Enter the value manually.` });
   }
 }
 
@@ -368,25 +347,25 @@ function currentWatch(): { tod: number; watchTime: number } | null {
 function updateEntry() {
   if (!entry) return;
   const tTrue = tTrueOf(entry);
-  const src = SOURCE_TR[entry.source];
-  const err = Number.isFinite(entry.offsetErrMs) ? `±${Math.ceil(entry.offsetErrMs)} ms` : 'senkronsuz';
+  const src = SOURCE_LABEL[entry.source];
+  const err = Number.isFinite(entry.offsetErrMs) ? `±${Math.ceil(entry.offsetErrMs)} ms` : 'unsynced';
   $('entry-info').textContent =
-    `Gerçek çekim anı: ${fmtDate(tTrue)} ${fmtTime(tTrue, 3)} · ${src} · ofset ${fmtSigned(entry.offsetMs, 0)} ms ${err}` +
-    (entry.latencyMs ? ` · gecikme ${entry.latencyMs.toFixed(0)} ms` : '');
+    `True capture time: ${fmtDate(tTrue)} ${fmtTime(tTrue, 3)} · ${src} · offset ${fmtSigned(entry.offsetMs, 0)} ms ${err}` +
+    (entry.latencyMs ? ` · latency ${entry.latencyMs.toFixed(0)} ms` : '');
 
   const w = currentWatch();
   watchInput.classList.toggle('invalid', !w);
   const out = $('drift-out');
   if (!w) {
-    out.textContent = 'Biçim: ss:dd:sn.k (ör. 12:48:41.8)';
+    out.textContent = 'Format: hh:mm:ss.f (e.g. 12:48:41.8)';
     return;
   }
   const d = (w.watchTime - tTrue) / 1000;
   if (entry.mode === 'calib') {
-    out.innerHTML = `Kamera gecikmesi: <b>${(-d * 1000).toFixed(0)} ms</b>`;
+    out.innerHTML = `Camera latency: <b>${(-d * 1000).toFixed(0)} ms</b>`;
   } else {
-    const dir = Math.abs(d) < 0.05 ? 'tam' : d > 0 ? 'ileri' : 'geri';
-    out.innerHTML = `Sapma: <b>${fmtSigned(d, 2, ' s')}</b> <span class="muted">(${dir})</span>`;
+    const dir = Math.abs(d) < 0.05 ? 'on time' : d > 0 ? 'fast' : 'slow';
+    out.innerHTML = `Drift: <b>${fmtSigned(d, 2, ' s')}</b> <span class="muted">(${dir})</span>`;
   }
 }
 
@@ -419,7 +398,7 @@ $('entry-save').addEventListener('click', () => void saveEntry(false));
 async function saveEntry(automatic: boolean) {
   if (!entry) return;
   const w = currentWatch();
-  if (!w) return toast('Saat biçimi geçersiz.');
+  if (!w) return toast('Invalid time format.');
   const tTrue = tTrueOf(entry);
 
   if (entry.mode === 'calib') {
@@ -431,7 +410,7 @@ async function saveEntry(automatic: boolean) {
     await kvSet('latencyMs', latencyMs);
     calibMode = false;
     entry = null;
-    toast(`Gecikme örneği ${lat.toFixed(0)} ms → medyan ${latencyMs.toFixed(0)} ms`);
+    toast(`Latency sample ${lat.toFixed(0)} ms → median ${latencyMs.toFixed(0)} ms`);
     location.hash = 'settings';
     return;
   }
@@ -462,14 +441,14 @@ async function saveEntry(automatic: boolean) {
     await kvSet('pendingReset', false);
   }
   entry = null;
-  toast(`${automatic ? 'Otomatik kaydedildi' : 'Kaydedildi'}: ${fmtSigned(m.drift, 2, ' s')}`, automatic ? 4000 : 3000);
+  toast(`${automatic ? 'Saved automatically' : 'Saved'}: ${fmtSigned(m.drift, 2, ' s')}`, automatic ? 4000 : 3000);
   location.hash = 'history';
 }
 
 // ---------- History ----------
 
 const MIN_RATE_SPAN_DAYS = 0.25;
-const SOURCE_TR: Record<Source, string> = { camera: 'kamera', upload: 'dosya', import: 'içe aktarım' };
+const SOURCE_LABEL: Record<Source, string> = { camera: 'camera', upload: 'file', import: 'import' };
 
 async function renderHistory() {
   const all = await allMeasurements();
@@ -481,22 +460,22 @@ async function renderHistory() {
 
   const sum = $('summary');
   if (cur.length === 0) {
-    sum.innerHTML = '<p class="muted">Henüz ölçüm yok. <a href="#measure" class="link">İlk ölçümü yap</a></p>';
+    sum.innerHTML = '<p class="muted">No measurements yet. <a href="#measure" class="link">Take the first one</a></p>';
   } else {
     const last = cur[cur.length - 1];
     const rate = fit
       ? `${fmtSigned(fit.rate, 1)}${Number.isFinite(fit.rateErr) ? `<span class="small muted"> ±${fit.rateErr.toFixed(1)}</span>` : ''}`
       : '—';
-    const span = rawFit ? `${rawFit.spanDays.toFixed(1)} gün` : '—';
+    const span = rawFit ? `${rawFit.spanDays.toFixed(1)} days` : '—';
     sum.innerHTML = `
       <div class="stats">
-        <div class="stat"><div class="v">${rate}</div><div class="k">s/gün (güncel seri)</div></div>
-        <div class="stat"><div class="v">${fmtSigned(last.drift, 1)}</div><div class="k">son sapma (s)</div></div>
-        <div class="stat"><div class="v">${cur.length}</div><div class="k">ölçüm · ${span}</div></div>
+        <div class="stat"><div class="v">${rate}</div><div class="k">s/day (current series)</div></div>
+        <div class="stat"><div class="v">${fmtSigned(last.drift, 1)}</div><div class="k">last drift (s)</div></div>
+        <div class="stat"><div class="v">${cur.length}</div><div class="k">measurements · ${span}</div></div>
       </div>
       <p class="muted small" style="margin:10px 0 0">
-        Rolex Superlative Chronometer hedefi: −2 / +2 s/gün (COSC: −4 / +6).
-        ${!fit || fit.spanDays < 2 ? 'Güvenilir oran için ölçümler arasında en az 1–2 gün bırak.' : ''}
+        Rolex Superlative Chronometer spec: −2 / +2 s/day (COSC: −4 / +6).
+        ${!fit || fit.spanDays < 2 ? 'For a reliable rate, leave at least 1–2 days between measurements.' : ''}
       </p>`;
   }
   renderChart($('chart'), cur, fit);
@@ -508,12 +487,12 @@ async function renderHistory() {
     li.className = 'item';
     li.innerHTML = `
       <div>
-        <div class="when">${fmtDate(m.tTrue)} ${fmtTime(m.tTrue, 1)}${m.reset ? '<span class="tag">ayar</span>' : ''}</div>
-        <div class="meta">saat ${fmtTime(m.watchTime, 2)} · ${SOURCE_TR[m.source]}${m.method === 'auto' ? ' · otomatik' : m.method === 'manual' && m.auto ? ' · elle düzeltildi' : ''}${m.note ? ' · ' + escapeHtml(m.note) : ''}</div>
+        <div class="when">${fmtDate(m.tTrue)} ${fmtTime(m.tTrue, 1)}${m.reset ? '<span class="tag">set</span>' : ''}</div>
+        <div class="meta">watch ${fmtTime(m.watchTime, 2)} · ${SOURCE_LABEL[m.source]}${m.method === 'auto' ? ' · auto' : m.method === 'manual' && m.auto ? ' · corrected manually' : ''}${m.note ? ' · ' + escapeHtml(m.note) : ''}</div>
       </div>
       <div>
         <div class="d">${fmtSigned(m.drift, 2, ' s')}</div>
-        <div class="ops"><button data-edit="${m.id}">Düzenle</button><button data-del="${m.id}">Sil</button></div>
+        <div class="ops"><button data-edit="${m.id}">Edit</button><button data-del="${m.id}">Delete</button></div>
       </div>`;
     list.appendChild(li);
   }
@@ -528,7 +507,7 @@ $('list').addEventListener('click', async (ev) => {
   const del = t.dataset.del;
   const edit = t.dataset.edit;
   if (del) {
-    if (!confirm('Bu ölçüm silinsin mi?')) return;
+    if (!confirm('Delete this measurement?')) return;
     await deleteMeasurement(del);
     void renderHistory();
   } else if (edit) {
@@ -561,8 +540,8 @@ async function renderSettings() {
   $<HTMLInputElement>('latency-input').value = latencyMs.toFixed(0);
   const samples = (await kvGet<LatencySample[]>('latencySamples')) ?? [];
   $('latency-samples').textContent = samples.length
-    ? `Örnekler: ${samples.map((s) => s.latencyMs.toFixed(0)).join(', ')} ms`
-    : 'Henüz kalibrasyon örneği yok (0 ms varsayılıyor).';
+    ? `Samples: ${samples.map((s) => s.latencyMs.toFixed(0)).join(', ')} ms`
+    : 'No calibration samples yet (assuming 0 ms).';
 }
 
 $('sync-now').addEventListener('click', () => void doSync());
@@ -581,7 +560,7 @@ $<HTMLInputElement>('latency-input').addEventListener('change', async (ev) => {
   if (!Number.isFinite(v)) return;
   latencyMs = v;
   await kvSet('latencyMs', v);
-  toast(`Gecikme ${v} ms olarak ayarlandı.`);
+  toast(`Latency set to ${v} ms.`);
 });
 $('calib-start').addEventListener('click', () => {
   calibMode = true;
@@ -605,13 +584,13 @@ $<HTMLInputElement>('import-csv').addEventListener('change', async (ev) => {
   const existing = new Set((await allMeasurements()).map((m) => m.id));
   const rows = fromCsv(await f.text()).filter((m) => !existing.has(m.id));
   for (const m of rows) await putMeasurement(m);
-  toast(`${rows.length} ölçüm içe aktarıldı.`);
+  toast(`Imported ${rows.length} measurements.`);
 });
 
 $('delete-all').addEventListener('click', async () => {
-  if (!confirm('Tüm ölçümler kalıcı olarak silinsin mi?')) return;
+  if (!confirm('Permanently delete all measurements?')) return;
   await clearMeasurements();
-  toast('Tüm ölçümler silindi.');
+  toast('All measurements deleted.');
 });
 
 // ---------- Reference clock ----------
@@ -640,7 +619,7 @@ function startRef() {
     const now = Date.now() + (sync?.offsetMs ?? 0);
     tEl.textContent = fmtTime(now, 0);
     msEl.textContent = '.' + String(Math.floor(now % 1000)).padStart(3, '0');
-    info.textContent = sync ? `senkron ±${Math.ceil(sync.errMs)} ms` : 'senkron yok!';
+    info.textContent = sync ? `sync ±${Math.ceil(sync.errMs)} ms` : 'no sync!';
     refRaf = requestAnimationFrame(tick);
   };
   tick();
@@ -693,23 +672,23 @@ function renderSetPhase() {
   const cancel = $('set-cancel');
   const ready = $('set-ready');
   if (setPhase === 'prep') {
-    $('set-step').textContent = '1 · Hazırlan';
+    $('set-step').textContent = '1 · Get ready';
     help.innerHTML =
-      `Kurmayı çek, saniye ibresi 12'de dursun. Akrep ve yelkovanı <b>${hhmm(setTarget)}</b> konumuna getir. ` +
-      `Hazır olunca dokun: son ${PIP_COUNT} saniyede kısa bipler, tam saatte uzun bip çalar.`;
-    cancel.textContent = 'Vazgeç';
-    ready.textContent = 'Hazırım';
+      `Pull the crown out so the seconds hand stops at 12. Set the hands to <b>${hhmm(setTarget)}</b>. ` +
+      `Tap when ready: short pips during the last ${PIP_COUNT} seconds, a long pip on the exact second.`;
+    cancel.textContent = 'Cancel';
+    ready.textContent = 'Ready';
   } else if (setPhase === 'armed') {
-    $('set-step').textContent = '2 · Bekle';
-    help.innerHTML = '<b>Uzun bipte</b> kurmaya bas.';
-    cancel.textContent = 'Vazgeç';
+    $('set-step').textContent = '2 · Wait';
+    help.innerHTML = 'Push the crown in on the <b>long pip</b>.';
+    cancel.textContent = 'Cancel';
   } else {
-    $('set-step').textContent = 'Başladı';
+    $('set-step').textContent = 'Running';
     help.innerHTML =
-      'Saat çalışıyor. Bir sonraki ölçüm <b>yeni seri</b> olarak işaretlenecek. ' +
-      'Birkaç dakika sonra fotoğraf çekip ilk sapmayı ölçebilirsin.';
-    cancel.textContent = 'Tekrar';
-    ready.textContent = 'Tamam';
+      'The watch is running. The next measurement will be marked as a <b>new series</b>. ' +
+      'Take a photo in a few minutes to measure the initial offset.';
+    cancel.textContent = 'Again';
+    ready.textContent = 'Done';
   }
   ready.hidden = setPhase === 'armed';
 }
@@ -750,7 +729,7 @@ function tickSet() {
   $('set-target').textContent = fmtTime(setTarget, 0);
   $('set-count').textContent = setPhase === 'done' ? `+${fmtCountdown(-rem)}` : fmtCountdown(rem);
   $('set-now').textContent =
-    `Şu an ${fmtTime(now, 1)} · ` + (sync ? `senkron ±${Math.ceil(sync.errMs)} ms` : 'senkron yok!');
+    `Now ${fmtTime(now, 1)} · ` + (sync ? `sync ±${Math.ceil(sync.errMs)} ms` : 'no sync!');
   setRaf = requestAnimationFrame(tickSet);
 }
 
@@ -762,7 +741,7 @@ $('set-ready').addEventListener('click', async () => {
   setLastSec = 0;
   renderSetPhase();
   const ok = await pips.unlock();
-  if (!ok) toast('Ses açılamadı; ekrandaki sayaca göre bas.', 5000);
+  if (!ok) toast('Audio unavailable; follow the on-screen countdown.', 5000);
 });
 
 $('set-cancel').addEventListener('click', () => {

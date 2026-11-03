@@ -5,7 +5,6 @@ A PWA that measures the rate of a mechanical watch (seconds per day). Take a pho
 and logs the drift.
 
 **Live:** https://onesvat.github.io/watch-logger/ — open it on your phone and add it to the home screen.
-The UI is in Turkish.
 
 <p>
   <img src="docs/screenshots/history.png" width="200" alt="History: rate, drift chart and measurements">
@@ -63,6 +62,6 @@ Pushing to `main` runs the tests and deploys to GitHub Pages (`.github/workflows
 
 ## Camera latency calibration (once)
 
-1. On a computer, open the app → Settings → **Referans saat** (reference clock).
-2. On the phone, Settings → **Kalibrasyon çekimi** (calibration shot) → photograph the screen.
+1. On a computer, open the app → Settings → **Reference clock**.
+2. On the phone, Settings → **Calibration shot** → photograph the screen.
 3. Enter the time visible in the photo. Repeat 3–5 times; the median is used.

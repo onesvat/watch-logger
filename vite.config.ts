@@ -13,8 +13,8 @@ export default defineConfig({
       manifest: {
         name: 'Watch Logger',
         short_name: 'WatchLog',
-        description: 'Mekanik saat sapma ölçer',
-        lang: 'tr',
+        description: 'Mechanical watch accuracy tracker',
+        lang: 'en',
         theme_color: '#0f1412',
         background_color: '#0f1412',
         display: 'standalone',

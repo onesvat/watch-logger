@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -14,12 +14,12 @@
     <!-- Measure -->
     <section id="view-measure" class="view">
       <header class="bar">
-        <span class="title">Ölç</span>
-        <button id="sync-badge" class="badge" title="Saat senkronu yenile">senkron…</button>
+        <span class="title">Measure</span>
+        <button id="sync-badge" class="badge" title="Refresh clock sync">syncing…</button>
       </header>
       <div id="calib-banner" class="banner" hidden>
-        Kalibrasyon: bilgisayardaki <b>Referans saat</b> ekranını çek.
-        <button id="calib-cancel" class="link">Vazgeç</button>
+        Calibration: photograph the <b>Reference clock</b> screen on the computer.
+        <button id="calib-cancel" class="link">Cancel</button>
       </div>
       <div class="camera">
         <video id="video" playsinline muted></video>
@@ -28,11 +28,11 @@
       </div>
       <div class="shutter-row">
         <label class="btn ghost">
-          Galeriden
+          Gallery
           <input id="file-input" type="file" accept="image/*,.heic,.heif" hidden />
         </label>
-        <button id="shutter" class="shutter" aria-label="Çek"></button>
-        <a class="btn ghost" href="#set">Saati kur</a>
+        <button id="shutter" class="shutter" aria-label="Capture"></button>
+        <a class="btn ghost" href="#set">Set watch</a>
       </div>
     </section>
 
@@ -44,8 +44,8 @@
       <div id="set-now" class="muted small"></div>
       <p id="set-help" class="set-help muted"></p>
       <div class="set-actions">
-        <button id="set-cancel" class="btn ghost">Vazgeç</button>
-        <button id="set-ready" class="btn primary">Hazırım</button>
+        <button id="set-cancel" class="btn ghost">Cancel</button>
+        <button id="set-ready" class="btn primary">Ready</button>
       </div>
     </section>
 
@@ -55,41 +55,41 @@
       <div class="sheet">
         <div id="auto-status" class="auto-status" hidden></div>
         <div id="entry-info" class="muted small"></div>
-        <label class="field-label" id="entry-label" for="watch-input">Saatin gösterdiği</label>
+        <label class="field-label" id="entry-label" for="watch-input">Watch shows</label>
         <div class="time-row">
-          <button class="step" data-step="-60000">−1 dk</button>
+          <button class="step" data-step="-60000">−1 min</button>
           <input id="watch-input" class="time-input" inputmode="decimal" autocomplete="off" spellcheck="false" />
-          <button class="step" data-step="60000">+1 dk</button>
+          <button class="step" data-step="60000">+1 min</button>
         </div>
         <div class="steps">
           <button class="step" data-step="-1000">−1 s</button>
-          <button class="step" data-step="-100">−0,1</button>
-          <button class="step" data-step="100">+0,1</button>
+          <button class="step" data-step="-100">−0.1</button>
+          <button class="step" data-step="100">+0.1</button>
           <button class="step" data-step="1000">+1 s</button>
         </div>
         <div id="drift-out" class="drift">—</div>
         <div id="upload-offset" class="row" hidden>
-          <label class="small" for="offset-input">Çeken cihazın saat ofseti (ms)</label>
+          <label class="small" for="offset-input">Capturing device clock offset (ms)</label>
           <input id="offset-input" type="number" step="1" class="num" />
         </div>
         <div id="entry-extra">
-          <input id="note-input" class="text" placeholder="Not (ör. gece kurmalı, masada yatay)" />
-          <label class="check"><input id="reset-input" type="checkbox" /> Saat bu ölçümden hemen önce ayarlandı (yeni seri)</label>
+          <input id="note-input" class="text" placeholder="Note (e.g. dial up overnight, wound in the evening)" />
+          <label class="check"><input id="reset-input" type="checkbox" /> Watch was set right before this measurement (new series)</label>
         </div>
         <div class="actions">
-          <button id="entry-cancel" class="btn ghost">İptal</button>
-          <button id="entry-save" class="btn primary">Kaydet</button>
+          <button id="entry-cancel" class="btn ghost">Cancel</button>
+          <button id="entry-save" class="btn primary">Save</button>
         </div>
       </div>
     </section>
 
     <!-- History -->
     <section id="view-history" class="view" hidden>
-      <header class="bar"><span class="title">Geçmiş</span></header>
+      <header class="bar"><span class="title">History</span></header>
       <div class="scroll">
         <div id="summary" class="card"></div>
         <div class="card chart-card">
-          <div class="chart-title">Sapma (s) — güncel seri</div>
+          <div class="chart-title">Drift (s) — current series</div>
           <div id="chart" class="chart"></div>
         </div>
         <ul id="list" class="list"></ul>
@@ -98,47 +98,47 @@
 
     <!-- Settings -->
     <section id="view-settings" class="view" hidden>
-      <header class="bar"><span class="title">Ayarlar</span></header>
+      <header class="bar"><span class="title">Settings</span></header>
       <div class="scroll">
         <div class="card">
-          <h3>Saat senkronu</h3>
+          <h3>Clock sync</h3>
           <p id="sync-detail" class="muted small"></p>
-          <button id="sync-now" class="btn">Şimdi senkronla</button>
+          <button id="sync-now" class="btn">Sync now</button>
         </div>
         <div class="card">
-          <h3>Otomatik okuma</h3>
-          <label class="check"><input id="autosave-input" type="checkbox" /> Güven yüksekse onay beklemeden kaydet</label>
+          <h3>Automatic reading</h3>
+          <label class="check"><input id="autosave-input" type="checkbox" /> Save without confirmation when confidence is high</label>
           <div class="row" style="margin-top: 8px">
-            <label class="small" for="datepos-input">Tarih penceresinin konumu (saat)</label>
+            <label class="small" for="datepos-input">Date window position (hour)</label>
             <input id="datepos-input" type="number" min="1" max="12" step="1" class="num" />
           </div>
           <p class="muted small">
-            12 yönü, çubuk endeksi olmayan iki konumdan (taç ve tarih penceresi) bulunur. Datejust için 3.
+            The 12 o'clock direction is found from the two positions without a baton index (crown and date window). 3 for a Datejust.
           </p>
         </div>
         <div class="card">
-          <h3>Kamera gecikmesi</h3>
+          <h3>Camera latency</h3>
           <p class="muted small">
-            Kare zaman damgası ile gerçek pozlama arasındaki fark. Bilgisayarda <b>Referans saat</b>'i aç,
-            telefonla çek, fotoğrafta görünen zamanı gir. Birkaç kez tekrarla; medyan kullanılır.
+            Difference between the frame timestamp and the actual exposure. Open the <b>Reference clock</b> on a computer,
+            photograph it with the phone and enter the time shown in the photo. Repeat a few times; the median is used.
           </p>
           <div class="row">
-            <label class="small" for="latency-input">Gecikme (ms)</label>
+            <label class="small" for="latency-input">Latency (ms)</label>
             <input id="latency-input" type="number" step="1" class="num" />
           </div>
           <p id="latency-samples" class="muted small"></p>
           <div class="actions">
-            <button id="calib-start" class="btn">Kalibrasyon çekimi</button>
-            <a class="btn ghost" href="#ref">Referans saat</a>
+            <button id="calib-start" class="btn">Calibration shot</button>
+            <a class="btn ghost" href="#ref">Reference clock</a>
           </div>
         </div>
         <div class="card">
-          <h3>Veri</h3>
+          <h3>Data</h3>
           <div class="actions">
-            <button id="export-csv" class="btn">CSV dışa aktar</button>
-            <label class="btn">CSV içe aktar<input id="import-csv" type="file" accept=".csv,text/csv" hidden /></label>
+            <button id="export-csv" class="btn">Export CSV</button>
+            <label class="btn">Import CSV<input id="import-csv" type="file" accept=".csv,text/csv" hidden /></label>
           </div>
-          <button id="delete-all" class="btn danger">Tüm ölçümleri sil</button>
+          <button id="delete-all" class="btn danger">Delete all measurements</button>
         </div>
       </div>
     </section>
@@ -148,13 +148,13 @@
       <div id="ref-time" class="ref-time">--:--:--</div>
       <div id="ref-ms" class="ref-ms">.---</div>
       <div id="ref-info" class="muted small"></div>
-      <a href="#settings" class="link">Kapat</a>
+      <a href="#settings" class="link">Close</a>
     </section>
 
     <nav id="nav" class="nav">
-      <a href="#measure" data-nav="measure">Ölç</a>
-      <a href="#history" data-nav="history">Geçmiş</a>
-      <a href="#settings" data-nav="settings">Ayarlar</a>
+      <a href="#measure" data-nav="measure">Measure</a>
+      <a href="#history" data-nav="history">History</a>
+      <a href="#settings" data-nav="settings">Settings</a>
     </nav>
 
     <div id="toast" class="toast" hidden></div>
