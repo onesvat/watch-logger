@@ -11,8 +11,9 @@
   --danger: #e0645a;
   --pos: #d9a441;
   --neg: #6fb3e6;
-  --nav-h: 58px;
-  --safe-b: env(safe-area-inset-bottom, 0px);
+  --nav-h: 50px;
+  /* Keep most of the home-indicator inset but not all of it: the full 34 px leaves a visible gap. */
+  --safe-b: max(0px, calc(env(safe-area-inset-bottom, 0px) - 14px));
   color-scheme: dark;
 }
 
