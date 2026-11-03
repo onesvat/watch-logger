@@ -7,19 +7,19 @@ export interface Measurement {
   id: string;
   createdAt: number;
   source: Source;
-  tDevice: number; // cihaz saatine göre çekim anı (epoch ms)
-  offsetMs: number; // uygulanan cihaz saati ofseti
+  tDevice: number; // capture time by the device clock (epoch ms)
+  offsetMs: number; // applied device clock offset
   offsetErrMs: number;
-  latencyMs: number; // uygulanan kamera gecikme düzeltmesi
-  tTrue: number; // düzeltilmiş gerçek çekim anı = tDevice + offset − latency
-  watchTime: number; // saatin gösterdiği an (epoch ms, elle girilen)
+  latencyMs: number; // applied camera latency correction
+  tTrue: number; // corrected true capture time = tDevice + offset − latency
+  watchTime: number; // time shown by the watch (epoch ms)
   drift: number; // s = watchTime − tTrue
   imgW: number;
   imgH: number;
   photo?: Blob;
   note: string;
   reset: boolean;
-  method?: 'auto' | 'manual'; // auto: görüntü işlemeyle okundu ve düzeltilmedi
+  method?: 'auto' | 'manual'; // auto: read by computer vision and not edited
   auto?: AutoResult;
 }
 

@@ -1,40 +1,40 @@
-// "Saati kur": bir sonraki tam 5 dakikaya geri sayım ve sinyal sesleri.
+// "Set the watch": countdown to the next full 5 minutes with time pips.
 
 export const SET_STEP_MS = 5 * 60_000;
-export const SET_MIN_LEAD_MS = 60_000; // ibreleri ayarlamak için en az bu kadar zaman
-export const PIP_COUNT = 5; // hedeften önceki kısa bip sayısı (son 5 s)
+export const SET_MIN_LEAD_MS = 60_000; // at least this much time to set the hands
+export const PIP_COUNT = 10; // short pips before the target (last 10 s)
 
-/** Gerçek zamandan en az `minLeadMs` sonraki ilk tam 5 dakika (yerel saat dilimi 15 dk katı varsayılır). */
+/** First full 5 minutes at least `minLeadMs` after true time (assumes the local UTC offset is a multiple of 15 min). */
 export function nextSetTarget(trueNow: number, minLeadMs = SET_MIN_LEAD_MS): number {
   return Math.ceil((trueNow + minLeadMs) / SET_STEP_MS) * SET_STEP_MS;
 }
 
-/** Kalan süre → "m:ss" (1 dk altında yalnızca saniye), yukarı yuvarlanır. */
+/** Remaining time → "m:ss" (seconds only below 1 min), rounded up. */
 export function fmtCountdown(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
   if (s < 60) return String(s);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-type NowTrue = () => number; // gerçek zaman (epoch ms) = Date.now() + ofset
+type NowTrue = () => number; // true time (epoch ms) = Date.now() + offset
 
 /**
- * Bipleri Web Audio saatine göre önceden planlar; böylece setTimeout/rAF titremesi olmadan
- * hoparlörden çıkış anı gerçek zamana birkaç ms içinde oturur.
+ * Schedules pips ahead of time on the Web Audio clock, so the speaker output lands within a few ms
+ * of true time without setTimeout/rAF jitter.
  */
 export class Pips {
   private ctx: AudioContext | null = null;
   private nodes: OscillatorNode[] = [];
 
-  /** Kullanıcı dokunuşu içinde çağrılmalı (iOS ses kilidi). Kısa bir onay sesi çalar. */
+  /** Must be called inside a user gesture (iOS audio unlock). Plays a short confirmation tone. */
   async unlock(): Promise<boolean> {
-    // iOS 17+: sessiz anahtarı açıkken de çal.
+    // iOS 17+: play even when the silent switch is on.
     const nav = navigator as unknown as { audioSession?: { type: string } };
     if (nav.audioSession) {
       try {
         nav.audioSession.type = 'playback';
       } catch {
-        /* desteklenmiyor */
+        /* not supported */
       }
     }
     this.ctx ??= new AudioContext();
@@ -43,12 +43,12 @@ export class Pips {
     return this.ctx.state === 'running';
   }
 
-  /** Gerçek zaman `tTrue` anına karşılık gelen, hoparlörden duyulacak AudioContext zamanı. */
+  /** AudioContext time at which a sound is heard from the speaker at true time `tTrue`. */
   private ctxTimeAt(tTrue: number, nowTrue: NowTrue): number {
     const ctx = this.ctx!;
     const ts = ctx.getOutputTimestamp?.();
     if (ts && ts.performanceTime && ts.contextTime) {
-      // ts: contextTime örneği performanceTime anında çıkıştan duyuluyor.
+      // ts: the contextTime sample is heard at the output at performanceTime.
       const trueAtTs = nowTrue() + (ts.performanceTime - performance.now());
       return ts.contextTime + (tTrue - trueAtTs) / 1000;
     }
@@ -56,7 +56,7 @@ export class Pips {
     return ctx.currentTime + (tTrue - nowTrue()) / 1000 - lat;
   }
 
-  /** Hedeften önceki her saniyede kısa, hedefte uzun bip. */
+  /** A short pip every second before the target, a long one at the target. */
   schedule(target: number, nowTrue: NowTrue) {
     if (!this.ctx) return;
     this.cancel();
@@ -74,7 +74,7 @@ export class Pips {
       try {
         n.stop();
       } catch {
-        /* zaten durdu */
+        /* already stopped */
       }
     }
     this.nodes = [];
@@ -92,7 +92,7 @@ export class Pips {
     const g = ctx.createGain();
     o.type = 'sine';
     o.frequency.value = freq;
-    // Başlangıç rampası 2 ms: tık sesini önler, başlangıç anını kaydırmaz.
+    // 2 ms attack ramp: avoids a click without shifting the onset.
     g.gain.setValueAtTime(0, at);
     g.gain.linearRampToValueAtTime(gain, at + 0.002);
     g.gain.setValueAtTime(gain, at + dur - 0.015);

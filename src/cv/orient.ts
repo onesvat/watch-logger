@@ -1,6 +1,6 @@
-// Kadranın 12 yönü (düzleştirilmiş koordinatlarda), kadran özelliklerinden:
-// 1) Saat endeksleri (uygulamalı çubuklar) 30° periyotlu parlak desen → hangi dakika çizgileri saat konumu.
-// 2) Taç (12) ve tarih penceresi (3) konumlarında çubuk endeks yoktur → 90° arayla eksik iki endeks.
+// The 12 direction of the dial (in rectified coordinates), from dial features:
+// 1) Hour indices (applied batons) form a bright 30°-periodic pattern → which minute ticks are hour positions.
+// 2) There is no baton at the crown (12) and date window (3) → two missing indices 90° apart.
 
 import { rectSample, type Rect } from './hands';
 
@@ -8,16 +8,16 @@ const TWO_PI = Math.PI * 2;
 const DEG = Math.PI / 180;
 
 export interface Orientation {
-  theta12: number; // rad, kadran koordinatlarında
-  k12: number; // 12'nin dakika çizgisi indeksi (θ = 6k°)
-  hourPhaseK: number; // saat konumlarının k mod 5 değeri
+  theta12: number; // rad, in dial coordinates
+  k12: number; // minute-tick index of 12 (θ = 6k°)
+  hourPhaseK: number; // k mod 5 of the hour positions
   hourPhaseStrength: number; // 0..1
-  dateContrast: number; // tarih sektörü / diğer saat sektörlerinin medyanı
-  sectorScores: number[]; // 12 saat konumunun parlaklık skorları (saat 12'den başlayarak)
-  margin: number; // en iyi ile ikinci 12 adayı arasındaki skor farkı
+  dateContrast: number; // date sector / median of the other hour sectors
+  sectorScores: number[]; // brightness scores of the 12 hour positions (starting at 12)
+  margin: number; // score gap between the best and second-best 12 candidates
 }
 
-/** Açısal profil: r ∈ [r0, r1] bandında ortalama parlaklık, n örnek. */
+/** Angular profile: mean brightness in the band r ∈ [r0, r1], n samples. */
 function angularProfile(R: Rect, r0: number, r1: number, n: number): Float64Array {
   const p = new Float64Array(n);
   const NR = 8;
@@ -38,7 +38,7 @@ function angularProfile(R: Rect, r0: number, r1: number, n: number): Float64Arra
   return p;
 }
 
-/** Saat konumundaki çubuk endeks varlığı: dar tepe (±1.5°) − yanlar (±4..8°), r 0.74–0.86. */
+/** Baton presence at an hour position: narrow peak (±1.5°) − flanks (±4..8°), r 0.74–0.86. */
 export function barScores(R: Rect, hourPhaseK: number): number[] {
   const out: number[] = [];
   for (let h = 0; h < 12; h++) {
@@ -60,7 +60,7 @@ export function barScores(R: Rect, hourPhaseK: number): number[] {
 
 export function findOrientation(R: Rect, datePosition = 3): Orientation {
   const N = 3600;
-  // Saat endeksleri: r ≈ 0.72–0.88 bandı. 12. harmonik (30° periyot) fazı.
+  // Hour indices: band r ≈ 0.72–0.88. Phase of the 12th harmonic (30° period).
   const idx = angularProfile(R, 0.74, 0.86, N);
   let re = 0;
   let im = 0;
@@ -74,13 +74,13 @@ export function findOrientation(R: Rect, datePosition = 3): Orientation {
     im += v * Math.sin(12 * t);
     vs += v * v;
   }
-  const phase = Math.atan2(im, re) / 12; // endeks tepe açısı (mod 30°)
+  const phase = Math.atan2(im, re) / 12; // index peak angle (mod 30°)
   const strength = (2 * (re * re + im * im)) / (N * vs || 1);
-  // En yakın dakika çizgisi indeksinin mod 5 değeri
+  // mod 5 of the nearest minute-tick index
   const hourPhaseK = ((Math.round(phase / (6 * DEG)) % 5) + 5) % 5;
 
-  // 12 ve tarih konumu: bu iki saat konumunda çubuk endeks yoktur (taç + tarih penceresi).
-  // Tarih penceresinin parlaklığı yardımcı kanıt (yansımada koyu olabilir, bu yüzden zayıf ağırlık).
+  // 12 and date position: these two hour positions have no baton (crown + date window).
+  // Date window brightness is supporting evidence (may look dark in reflections, hence a low weight).
   const bars = barScores(R, hourPhaseK);
   const wide = angularProfile(R, 0.5, 0.85, 720);
   const sector = (theta: number) => {
@@ -98,7 +98,7 @@ export function findOrientation(R: Rect, datePosition = 3): Orientation {
   const scMed = [...scores].sort((a, b) => a - b)[6];
   const cand = [...Array(12).keys()].map((h) => {
     const hd = (h + datePosition) % 12;
-    const missing = (barMed - bars[h]) + (barMed - bars[hd]); // büyük = iki endeks de yok
+    const missing = (barMed - bars[h]) + (barMed - bars[hd]); // large = both indices missing
     const date = scores[hd] / (scMed || 1) - 1;
     return { h, score: missing / (barMed || 1) + 0.15 * date };
   });

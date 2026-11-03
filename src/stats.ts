@@ -1,16 +1,16 @@
-// Sapma serileri ve günlük oran (s/gün) hesabı.
+// Drift series and daily rate (s/day).
 
 export interface Sample {
   tTrue: number; // epoch ms
   drift: number; // s
-  reset?: boolean; // saat bu ölçümden hemen önce ayarlandı → yeni seri başlar
+  reset?: boolean; // watch was set right before this measurement → a new series starts
 }
 
 export interface Fit {
-  rate: number; // s/gün
-  intercept: number; // ilk ölçüm anındaki sapma (s)
+  rate: number; // s/day
+  intercept: number; // drift at the first measurement (s)
   residualStd: number; // s
-  rateErr: number; // s/gün, eğimin standart hatası (n>2)
+  rateErr: number; // s/day, standard error of the slope (n>2)
   n: number;
   spanDays: number;
 }
@@ -51,7 +51,7 @@ export function linearFit(samples: Sample[]): Fit | null {
   return { rate, intercept, residualStd, rateErr, n, spanDays: xs[n - 1] - xs[0] };
 }
 
-/** Ardışık ölçümler arasındaki oranlar (s/gün). Çok yakın ölçümler (< minHours) atlanır. */
+/** Rates between consecutive measurements (s/day). Measurements closer than minHours are skipped. */
 export function pairRates(samples: Sample[], minHours = 6): { from: number; to: number; rate: number }[] {
   const out: { from: number; to: number; rate: number }[] = [];
   let prev: Sample | undefined;

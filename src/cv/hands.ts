@@ -1,20 +1,20 @@
-// İbre tespiti düzleştirilmiş kadran koordinatlarında (birim = dakika çizgisi iç ucu).
-// Kadrana paralel ibre düzlemi, kamera merkezli izdüşümde kadran düzlemine homoteti ile eşlenir:
-// ibre yönleri korunur, yalnız konum/ölçek kayar (paralaks). Bu yüzden açı = çizgi yönü.
+// Hand detection in rectified dial coordinates (unit = inner minute-tick end).
+// The hand plane is parallel to the dial, so under central projection it maps to the dial plane by a homothety:
+// hand directions are preserved, only position/scale shift (parallax). Hence angle = line direction.
 
 import { sample, type Gray } from './image';
 import { applyH, type H3 } from './homography';
 
 export interface Rect {
   img: Gray;
-  extent: number; // görüntü [-extent, extent]² kadran birimini kaplar
+  extent: number; // image covers [-extent, extent]² dial units
 }
 
 export interface Line {
-  phi: number; // göbekten uca yön (rad)
-  d: number; // orijine işaretli uzaklık (normal n = (-sin φ, cos φ))
+  phi: number; // direction from hub to tip (rad)
+  d: number; // signed distance to origin (normal n = (-sin φ, cos φ))
   score: number;
-  polarity: 1 | -1; // +1: yapı zeminden parlak
+  polarity: 1 | -1; // +1: structure brighter than the background
 }
 
 const TWO_PI = Math.PI * 2;
@@ -28,8 +28,8 @@ export function rectSample(r: Rect, u: number, v: number): number {
 export const angDiff = (a: number, b: number) => Math.abs(((a - b + 3 * Math.PI) % TWO_PI) - Math.PI);
 
 /**
- * Çizgi boyunca dik profillerin, düz zemin üzerinde Gauss çizgi şablonuyla normalize çapraz
- * korelasyonunun medyanı. İşaret = polarite (+: parlak çizgi).
+ * Median normalised cross-correlation of the perpendicular profiles along a line with a Gaussian
+ * line template on a flat background. Sign = polarity (+: bright line).
  */
 export function nccMedian(at: At, phi: number, d: number, sigma: number, half: number, s0: number, s1: number, n: number): number {
   const ux = Math.cos(phi);
@@ -79,13 +79,13 @@ export function nccMedian(at: At, phi: number, d: number, sigma: number, half: n
   return vals[vals.length >> 1];
 }
 
-// ---------------- Akrep & yelkovan: lüm şeritleri ----------------
+// ---------------- Hour & minute hands: lume strips ----------------
 
 export interface LumeHand extends Line {
-  end: number; // lüm şeridinin göbekten uzaklığı (s) — yelkovan > akrep
+  end: number; // distance of the lume strip end from the hub (s) — minute > hour
 }
 
-/** Parlak lüm şeritlerini (φ, d) ızgarasında arar; en iyi `k` farklı yönü döndürür. */
+/** Searches bright lume strips on a (φ, d) grid; returns the best `k` distinct directions. */
 export function findLumeHands(r: Rect, k = 4): LumeHand[] {
   const at: At = (u, v) => rectSample(r, u, v);
   const sigma = 0.008;
@@ -103,7 +103,7 @@ export function findLumeHands(r: Rect, k = 4): LumeHand[] {
   for (const c of cands) {
     if (out.length >= k) break;
     if (out.some((o) => angDiff(o.phi, c.phi) < (6 * Math.PI) / 180)) continue;
-    // Yerel iyileştirme (φ, d) — ince ızgara
+    // Local refinement (φ, d) — fine grid
     let best = c;
     for (let dp = -0.5; dp <= 0.5; dp += 0.1) {
       for (let dd = -0.004; dd <= 0.004 + 1e-9; dd += 0.001) {
@@ -112,7 +112,7 @@ export function findLumeHands(r: Rect, k = 4): LumeHand[] {
         if (m > best.score) best = { phi, d: c.d + dd, score: m, polarity: 1 };
       }
     }
-    // Lüm şeridinin bittiği yer
+    // Where the lume strip ends
     let end = 0.45;
     for (let s = 0.45; s < 1.0; s += 0.025) {
       if (nccMedian(at, best.phi, best.d, sigma, half, s, s + 0.025, 4) > 0.5) end = s + 0.025;
@@ -123,7 +123,7 @@ export function findLumeHands(r: Rect, k = 4): LumeHand[] {
   return out;
 }
 
-/** İki çizginin kesişimi (paralelse null). */
+/** Intersection of two lines (null if parallel). */
 export function intersect(a: { phi: number; d: number }, b: { phi: number; d: number }): [number, number] | null {
   // n·x = d,  n = (-sin φ, cos φ)
   const a1 = -Math.sin(a.phi), b1 = Math.cos(a.phi);
@@ -133,7 +133,7 @@ export function intersect(a: { phi: number; d: number }, b: { phi: number; d: nu
   return [(a.d * b2 - b.d * b1) / det, (a1 * b.d - a2 * a.d) / det];
 }
 
-// ---------------- Saniye ibresi ----------------
+// ---------------- Seconds hand ----------------
 
 export interface SecondsCandidate {
   phi: number;
@@ -144,9 +144,9 @@ export interface SecondsCandidate {
 }
 
 /**
- * Saniye ibresi: (φ, d) ızgarasında, verilen açı penceresinde ince çizgi araması. Polarite ve kalınlıktan
- * bağımsız (iki ölçekte |NCC|). Karşı taraftaki kuyruk (aynı polarite) ve uca kadar süreklilik bonus verir;
- * akrep/yelkovan yönleri (±4°) cezalandırılır (ibre kenarları ince çizgi gibi görünür).
+ * Seconds hand: thin-line search on a (φ, d) grid within the given angle window. Independent of polarity and
+ * width (|NCC| at two scales). The counterweight tail (same polarity) and continuity up to the tip add a bonus;
+ * hour/minute hand directions (±4°) are penalised (hand edges look like thin lines).
  */
 export function findSeconds(
   r: Rect,
@@ -185,8 +185,8 @@ export function findSeconds(
 }
 
 /**
- * Tam çözünürlükte alt-piksel çizgi: her s için dik profilde zemin çıkarılmış ağırlık merkezi
- * (parlak veya koyu, düz ya da bombeli ibre için simetrik), ardından aykırı ayıklamalı TLS doğru.
+ * Sub-pixel line at full resolution: background-subtracted centroid of the perpendicular profile for each s
+ * (symmetric for bright or dark, flat or domed hands), followed by an outlier-trimmed TLS line fit.
  */
 export function refineLine(
   g: Gray,

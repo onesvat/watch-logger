@@ -1,15 +1,15 @@
-// Kadran düzlemi: 60 dakika çizgisini tam çözünürlükte tek tek konumlar, homografi uydurur.
-// Kadran koordinatları: dakika çizgisi iç uçları birim çember üzerinde; k. çizgi θ = 2πk/60'da
-// (görüntüde t ile aynı dönüş yönü). 12'nin hangi çizgi olduğu burada bilinmez.
+// Dial plane: locates each of the 60 minute ticks at full resolution and fits a homography.
+// Dial coordinates: inner tick ends lie on the unit circle; tick k is at θ = 2πk/60
+// (same rotation direction as t in the image). Which tick is 12 is not known here.
 
 import { sample, type Gray } from './image';
 import { applyH, fitHRansac, invertH, type H3 } from './homography';
 import { ringEnergy, ringPoint, type RingFit } from './ring';
 
 export interface DialFit {
-  H: H3; // kadran → görüntü
-  Hinv: H3; // görüntü → kadran
-  sIn: number; // çizgi iç ucunun halka ölçeğindeki konumu
+  H: H3; // dial → image
+  Hinv: H3; // image → dial
+  sIn: number; // inner tick end position on the ring scale
   sOut: number;
   ticks: { k: number; img: [number, number]; weight: number; residual: number }[];
   rmsPx: number;
@@ -22,7 +22,7 @@ export function scaleRing(r: RingFit, f: number): RingFit {
   return { ...r, cx: r.cx * f, cy: r.cy * f, a: r.a * f };
 }
 
-/** Dakika çizgilerinin radyal bandı: 60. harmonik enerjisinin yarı-tepe genişliği. */
+/** Radial band of the minute ticks: half-maximum width of the 60th-harmonic energy. */
 function tickBand(g: Gray, r: RingFit): [number, number] {
   const ss: number[] = [];
   const es: number[] = [];
@@ -49,8 +49,8 @@ interface TickObs {
 }
 
 /**
- * k. dakika çizgisini `map` ile verilen (θ, ρ) kadran koordinatlarında örnekleyerek bulur:
- * açısal konum = zemin çıkarılmış ağırlık merkezi, radyal = iç ucun yarı-kontrast geçişi.
+ * Finds minute tick k by sampling in (θ, ρ) dial coordinates given by `map`:
+ * angular position = background-subtracted centroid, radial = half-contrast crossing of the inner end.
  */
 function localizeTick(g: Gray, map: DialMap, k: number, r0: number, r1: number, pol: number): TickObs | null {
   const period = TWO_PI / 60;
@@ -71,7 +71,7 @@ function localizeTick(g: Gray, map: DialMap, k: number, r0: number, r1: number, 
   let sw = 0;
   let sm = 0;
   for (let i = 0; i < prof.length; i++) {
-    const v = prof[i] - bg - 0.35 * peak; // yalnız çizginin gövdesi
+    const v = prof[i] - bg - 0.35 * peak; // only the body of the tick
     if (v > 0) {
       sw += v;
       sm += v * (i - M);
@@ -106,14 +106,14 @@ export function fitDial(g: Gray, ring: RingFit): DialFit {
   const [b0, b1] = tickBand(g, ring);
   const unit = (k: number): [number, number] => [Math.cos((k * TWO_PI) / 60), Math.sin((k * TWO_PI) / 60)];
 
-  // Aşama 0: afin halka üzerinden ilk tahmin
+  // Stage 0: initial estimate from the affine ring
   const ringMap: DialMap = (t, r) => ringPoint(ring, t + ring.phase / 60, r);
   let obs = [...Array(60).keys()].map((k) => localizeTick(g, ringMap, k, b0, b1, pol)).filter((o) => o !== null);
-  if (obs.length < 12) throw new Error(`Yetersiz dakika çizgisi (${obs.length})`);
+  if (obs.length < 12) throw new Error(`Not enough minute ticks (${obs.length})`);
   const thr0 = Math.max(2, 0.006 * ring.a);
   let fit = fitHRansac(obs.map((o) => unit(o.k)), obs.map((o) => o.img), thr0);
 
-  // Aşama 1..3: homografinin öngördüğü konumlarda tüm çizgileri yeniden bul
+  // Stages 1..3: re-locate all ticks at the positions predicted by the homography
   const len = (b1 - b0) / b0;
   for (const f of [1, 0.6, 0.45]) {
     const H = fit.H;
@@ -136,7 +136,7 @@ export function fitDial(g: Gray, ring: RingFit): DialFit {
   };
 }
 
-/** Kadran koordinatlarından (birim = çizgi iç ucu) düzleştirilmiş kare görüntü. */
+/** Rectified square image from dial coordinates (unit = inner tick end). */
 export function rectify(g: Gray, H: H3, size: number, extent = 1.15): Gray {
   const out = { w: size, h: size, data: new Float32Array(size * size) };
   for (let y = 0; y < size; y++) {

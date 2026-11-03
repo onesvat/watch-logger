@@ -37,16 +37,16 @@ registerSW({ immediate: true });
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
-// ---------- Durum ----------
+// ---------- State ----------
 
-const SYNC_MAX_AGE = 30 * 60_000; // cihaz saati dakikalar içinde ms mertebesinde kaymaz
+const SYNC_MAX_AGE = 30 * 60_000; // the device clock does not drift by ms within minutes
 let sync: SyncResult | null = null;
 let syncing: Promise<SyncResult | null> | null = null;
 let latencyMs = 0;
 let calibMode = false;
 let autoSave = true;
 let datePosition = 3;
-let pendingReset = false; // saat kuruldu → sonraki ölçüm yeni seri
+let pendingReset = false; // watch was just set → next measurement starts a new series
 const AUTO_SAVE_MIN_CONF = 0.75;
 
 interface Entry {
@@ -61,14 +61,14 @@ interface Entry {
   latencyMs: number;
   existing?: Measurement;
   auto?: AutoResult;
-  autoText?: string; // otomatik okumanın giriş alanına yazdığı metin (elle düzeltme tespiti)
+  autoText?: string; // text the auto-read wrote into the input (to detect manual edits)
 }
 let entry: Entry | null = null;
 
 const viewer = new Viewer($<HTMLCanvasElement>('photo'));
 const video = $<HTMLVideoElement>('video');
 
-// ---------- Yardımcılar ----------
+// ---------- Helpers ----------
 
 let toastTimer = 0;
 function toast(msg: string, ms = 3000) {
@@ -85,7 +85,7 @@ const median = (xs: number[]) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
-// ---------- Saat senkronu ----------
+// ---------- Clock sync ----------
 
 function renderSync(state: 'busy' | 'ok' | 'err') {
   const b = $('sync-badge');
@@ -99,7 +99,7 @@ function renderSync(state: 'busy' | 'ok' | 'err') {
     b.textContent = sync ? `eski senkron` : 'senkron yok';
   } else {
     b.classList.add(sync.errMs < 50 ? 'ok' : 'warn');
-    // offset = gerçek − cihaz → cihaz, gerçeğe göre −offset kadar ileri
+    // offset = true − device → device is ahead of true time by −offset
     b.textContent = `Telefon ${fmtSigned(-sync.offsetMs, 0)} ms ±${Math.ceil(sync.errMs)}`;
   }
   $('sync-detail').textContent = sync
@@ -118,7 +118,7 @@ function doSync(): Promise<SyncResult | null> {
       return sync;
     } catch (e) {
       renderSync('err');
-      toast(`Senkron başarısız: ${(e as Error).message}`);
+      toast(`Senkron başarısız: ${trMessage((e as Error).message)}`);
       return null;
     } finally {
       syncing = null;
@@ -132,7 +132,7 @@ async function freshSync(): Promise<SyncResult | null> {
   return (await doSync()) ?? sync;
 }
 
-// ---------- Görünümler ----------
+// ---------- Views ----------
 
 type ViewName = 'measure' | 'entry' | 'history' | 'settings' | 'ref' | 'set';
 const VIEWS: ViewName[] = ['measure', 'entry', 'history', 'settings', 'ref', 'set'];
@@ -165,7 +165,7 @@ function route() {
 }
 window.addEventListener('hashchange', route);
 
-// ---------- Ölç ----------
+// ---------- Measure ----------
 
 async function openMeasure() {
   $('calib-banner').hidden = !calibMode;
@@ -202,7 +202,7 @@ $('shutter').addEventListener('click', async () => {
       latencyMs: calibMode ? 0 : latencyMs,
     });
   } catch (e) {
-    toast(`Çekim başarısız: ${(e as Error).message}`);
+    toast(`Çekim başarısız: ${trMessage((e as Error).message)}`);
   } finally {
     btn.disabled = false;
   }
@@ -240,7 +240,7 @@ $('calib-cancel').addEventListener('click', () => {
   $('calib-banner').hidden = true;
 });
 
-// ---------- Okuma girişi ----------
+// ---------- Reading entry ----------
 
 const watchInput = $<HTMLInputElement>('watch-input');
 const offsetInput = $<HTMLInputElement>('offset-input');
@@ -286,15 +286,37 @@ async function openEntry(e: Entry, prefillWatch?: number) {
 }
 
 const STAGE_TR: Record<string, string> = {
-  merkez: 'kadran aranıyor',
-  halka: 'dakika çizgileri',
-  homografi: 'perspektif düzeltme',
-  düzleştirme: 'perspektif düzeltme',
-  '12-yönü': '12 yönü',
-  'akrep-yelkovan': 'akrep/yelkovan',
-  'saniye-arama': 'saniye ibresi',
-  'saniye-iyileştirme': 'saniye ibresi (alt-piksel)',
+  center: 'kadran aranıyor',
+  ring: 'dakika çizgileri',
+  homography: 'perspektif düzeltme',
+  rectify: 'perspektif düzeltme',
+  orientation: '12 yönü',
+  hands: 'akrep/yelkovan',
+  'seconds-search': 'saniye ibresi',
+  'seconds-refine': 'saniye ibresi (alt-piksel)',
 };
+
+// Messages from the CV pipeline and helpers are English; the UI shows them in Turkish.
+const MESSAGE_TR: [RegExp, string][] = [
+  [/^Dial not found$/, 'Kadran bulunamadı'],
+  [/^Dial is small \((\d+) px\) — shoot closer$/, 'Kadran küçük ($1 px) — daha yakından çekin'],
+  [/^12 direction ambiguous$/, '12 yönü belirsiz'],
+  [/^Minute hand not found$/, 'Yelkovan bulunamadı'],
+  [/^Seconds hand not found$/, 'Saniye ibresi bulunamadı'],
+  [/^Seconds hand candidates are close$/, 'Saniye ibresi adayları yakın'],
+  [/^Minute\/seconds mismatch \((.+)\)$/, 'Yelkovan–saniye tutarsız ($1)'],
+  [/^Hour hand mismatch \((.+)\)$/, 'Akrep tutarsız ($1)'],
+  [/^Not enough minute ticks \((\d+)\)$/, 'Yetersiz dakika çizgisi ($1)'],
+  [/^singular system$/, 'tekil sistem'],
+  [/^Invalid server response: /, 'Geçersiz sunucu cevabı: '],
+  [/^Time server unreachable$/, 'Zaman sunucusuna ulaşılamadı'],
+  [/^toBlob failed$/, 'toBlob başarısız'],
+];
+
+function trMessage(msg: string): string {
+  for (const [re, tr] of MESSAGE_TR) if (re.test(msg)) return msg.replace(re, tr);
+  return msg;
+}
 
 function setAutoStatus(state: { kind: 'busy' | 'ok' | 'warn' | 'err'; html: string } | null) {
   const el = $('auto-status');
@@ -307,7 +329,7 @@ function setAutoStatus(state: { kind: 'busy' | 'ok' | 'warn' | 'err'; html: stri
 function showAuto(r: AutoResult) {
   viewer.setOverlay((ctx, px) => drawOverlay(ctx, r.overlay, px));
   const conf = Math.round(r.confidence * 100);
-  const warn = r.warnings.length ? ` · ${r.warnings.map(escapeHtml).join(', ')}` : '';
+  const warn = r.warnings.length ? ` · ${r.warnings.map((w) => escapeHtml(trMessage(w))).join(', ')}` : '';
   setAutoStatus({
     kind: r.warnings.length || r.confidence < AUTO_SAVE_MIN_CONF ? 'warn' : 'ok',
     html: `Otomatik: <b>${fmtTod(r.todSeconds * 1000, 2)}</b> · güven %${conf}${warn}`,
@@ -332,7 +354,7 @@ async function runAuto(e: Entry, bitmap: ImageBitmap) {
       await saveEntry(true);
     }
   } catch (err) {
-    if (entry === e) setAutoStatus({ kind: 'err', html: `Otomatik okunamadı: ${escapeHtml((err as Error).message)}. Değeri elle girin.` });
+    if (entry === e) setAutoStatus({ kind: 'err', html: `Otomatik okunamadı: ${escapeHtml(trMessage((err as Error).message))}. Değeri elle girin.` });
   }
 }
 
@@ -401,7 +423,7 @@ async function saveEntry(automatic: boolean) {
   const tTrue = tTrueOf(entry);
 
   if (entry.mode === 'calib') {
-    const lat = tTrue - w.watchTime; // kare damgası − gerçek pozlama anı
+    const lat = tTrue - w.watchTime; // frame timestamp − true exposure time
     const samples = ((await kvGet<LatencySample[]>('latencySamples')) ?? []).slice(-9);
     samples.push({ at: Date.now(), latencyMs: lat, timeSource: 'camera' });
     await kvSet('latencySamples', samples);
@@ -444,7 +466,7 @@ async function saveEntry(automatic: boolean) {
   location.hash = 'history';
 }
 
-// ---------- Geçmiş ----------
+// ---------- History ----------
 
 const MIN_RATE_SPAN_DAYS = 0.25;
 const SOURCE_TR: Record<Source, string> = { camera: 'kamera', upload: 'dosya', import: 'içe aktarım' };
@@ -454,7 +476,7 @@ async function renderHistory() {
   const segs = segments(all);
   const cur = segs[segs.length - 1] ?? [];
   const rawFit = linearFit(cur);
-  // 6 saatten kısa aralıkta okuma hatası (±0,2 s) oranı anlamsız kılar.
+  // Over spans shorter than 6 h the reading error (±0.2 s) makes the rate meaningless.
   const fit = rawFit && rawFit.spanDays >= MIN_RATE_SPAN_DAYS ? rawFit : null;
 
   const sum = $('summary');
@@ -530,7 +552,7 @@ $('list').addEventListener('click', async (ev) => {
   }
 });
 
-// ---------- Ayarlar ----------
+// ---------- Settings ----------
 
 async function renderSettings() {
   renderSync(sync ? 'ok' : 'err');
@@ -592,7 +614,7 @@ $('delete-all').addEventListener('click', async () => {
   toast('Tüm ölçümler silindi.');
 });
 
-// ---------- Referans saat ----------
+// ---------- Reference clock ----------
 
 let refRaf = 0;
 let wakeLock: { release(): Promise<void> } | null = null;
@@ -630,7 +652,7 @@ function stopRef() {
   releaseWakeLock();
 }
 
-// ---------- Saati kur ----------
+// ---------- Set the watch ----------
 
 type SetPhase = 'prep' | 'armed' | 'done';
 let setPhase: SetPhase = 'prep';
@@ -698,7 +720,7 @@ function tickSet() {
   const view = $('view-set');
 
   if (setPhase === 'prep' && rem < (PIP_COUNT + 3) * 1000) {
-    // Hazırım'a basıldığında tüm biplere yetecek süre kalmadı → sonraki 5 dakika.
+    // Not enough time left for all pips after pressing Ready → move to the next 5 minutes.
     setTarget += SET_STEP_MS;
     rem += SET_STEP_MS;
     renderSetPhase();
@@ -748,7 +770,7 @@ $('set-cancel').addEventListener('click', () => {
   location.hash = 'measure';
 });
 
-// ---------- Başlangıç ----------
+// ---------- Startup ----------
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') void freshSync();

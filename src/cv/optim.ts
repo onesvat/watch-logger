@@ -1,4 +1,4 @@
-// Türevsiz yerel optimizasyon (Nelder–Mead), en küçükleme.
+// Derivative-free local optimisation (Nelder–Mead), minimisation.
 
 export function nelderMead(
   f: (x: number[]) => number,

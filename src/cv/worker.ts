@@ -1,4 +1,4 @@
-// Otomatik okuma Web Worker'ı: RGBA piksel alır, readWatch çalıştırır, ilerleme ve sonuç gönderir.
+// Auto-read Web Worker: receives RGBA pixels, runs readWatch, posts progress and result.
 
 import { fromRGBA } from './image';
 import { readWatch } from './read';

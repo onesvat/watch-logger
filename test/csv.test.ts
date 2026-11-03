@@ -9,7 +9,7 @@ const m: Measurement = {
 };
 
 describe('csv', () => {
-  it('gidiş-dönüş', () => {
+  it('round trip', () => {
     const [r] = fromCsv(toCsv([m]));
     expect(r.id).toBe('a1');
     expect(r.tTrue).toBe(m.tTrue);

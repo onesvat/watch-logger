@@ -1,11 +1,11 @@
-// Ana iş parçacığı ↔ okuma worker'ı mesajları ve saklanan otomatik okuma sonucu.
+// Main thread ↔ reader worker messages and the stored auto-read result.
 
 import type { H3 } from './homography';
 
 export interface AutoOverlay {
-  H: H3; // kadran → görüntü
+  H: H3; // dial → image
   theta12: number;
-  lines: { name: string; phi: number; d: number }[]; // 'yelkovan' | 'akrep' | 'sec*'
+  lines: { name: string; phi: number; d: number }[]; // 'minute' | 'hour' | 'sec*' (older records: 'yelkovan' | 'akrep')
 }
 
 export interface AutoResult {

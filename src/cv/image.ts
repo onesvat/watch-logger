@@ -1,4 +1,4 @@
-// Gri tonlu kayan noktalı görüntü ve temel işlemler (DOM'dan bağımsız; worker ve node'da çalışır).
+// Greyscale floating-point image and basic operations (DOM-free; runs in the worker and in node).
 
 export interface Gray {
   w: number;
@@ -10,7 +10,7 @@ export function gray(w: number, h: number): Gray {
   return { w, h, data: new Float32Array(w * h) };
 }
 
-/** RGBA (ImageData.data) → gri (Rec. 709 luma). */
+/** RGBA (ImageData.data) → grey (Rec. 709 luma). */
 export function fromRGBA(rgba: Uint8ClampedArray | Uint8Array, w: number, h: number): Gray {
   const g = gray(w, h);
   for (let i = 0, j = 0; i < g.data.length; i++, j += 4) {
@@ -25,7 +25,7 @@ export function fromU8(u8: Uint8Array, w: number, h: number): Gray {
   return g;
 }
 
-/** Tam sayı faktörüyle kutu filtreli küçültme. */
+/** Box-filtered downscale by an integer factor. */
 export function downscale(src: Gray, f: number): Gray {
   const w = Math.floor(src.w / f);
   const h = Math.floor(src.h / f);
@@ -44,7 +44,7 @@ export function downscale(src: Gray, f: number): Gray {
   return out;
 }
 
-/** Çift doğrusal örnekleme; dışarısı NaN. */
+/** Bilinear sampling; NaN outside. */
 export function sample(g: Gray, x: number, y: number): number {
   if (!(x >= 0 && y >= 0 && x <= g.w - 1 && y <= g.h - 1)) return NaN;
   const x0 = Math.min(Math.floor(x), g.w - 2);
@@ -58,7 +58,7 @@ export function sample(g: Gray, x: number, y: number): number {
   );
 }
 
-/** Ayrılabilir Gauss bulanıklaştırma. */
+/** Separable Gaussian blur. */
 export function blur(src: Gray, sigma: number): Gray {
   const r = Math.max(1, Math.ceil(sigma * 3));
   const k = new Float32Array(2 * r + 1);
@@ -92,7 +92,7 @@ export function blur(src: Gray, sigma: number): Gray {
   return out;
 }
 
-/** Sobel gradyanı. */
+/** Sobel gradient. */
 export function gradient(g: Gray): { gx: Float32Array; gy: Float32Array; mag: Float32Array } {
   const { w, h, data: d } = g;
   const gx = new Float32Array(w * h);

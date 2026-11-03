@@ -1,23 +1,23 @@
-// Eşmerkezli elipslerin (kadran, bezel, kasa) ortak merkezini bulur.
-// Elips üzerindeki paralel teğetli (zıt gradyanlı) iki noktanın orta noktası elips merkezidir;
-// bu orta noktalar bir akümülatöre oylanır.
+// Finds the common centre of concentric ellipses (dial, bezel, case).
+// The midpoint of two points on an ellipse with parallel tangents (opposite gradients) is the ellipse
+// centre; these midpoints vote into an accumulator.
 
 import { blur, gradient, type Gray } from './image';
 
 export interface CenterResult {
   x: number;
   y: number;
-  score: number; // tepe / ortalama oy oranı
+  score: number; // peak / mean vote ratio
 }
 
-const BINS = 180; // 2° yön kutusu
+const BINS = 180; // 2° orientation bin
 
-/** En güçlü `k` merkez adayı (birbirinden en az `sep` piksel uzak). */
+/** The strongest `k` centre candidates (at least `sep` pixels apart). */
 export function findCenters(g: Gray, k = 6, maxPoints = 12000): CenterResult[] {
   const { w, h } = g;
   const { gx, gy, mag } = gradient(blur(g, 1.2));
 
-  // En güçlü kenar noktaları (gradyan büyüklüğü eşiği = üst yüzdelik)
+  // Strongest edge points (gradient magnitude threshold = upper percentile)
   const sorted = Float32Array.from(mag).sort();
   const thr = sorted[Math.max(0, sorted.length - maxPoints)];
   const bins: number[][] = Array.from({ length: BINS }, () => []);
@@ -25,7 +25,7 @@ export function findCenters(g: Gray, k = 6, maxPoints = 12000): CenterResult[] {
     for (let x = 2; x < w - 2; x++) {
       const i = y * w + x;
       if (mag[i] < thr || mag[i] === 0) continue;
-      // Kenar inceltme: gradyan yönünde yerel maksimum olmayanları at
+      // Edge thinning: drop points that are not a local maximum along the gradient
       const ux = gx[i] / mag[i];
       const uy = gy[i] / mag[i];
       const a = mag[Math.round(y + uy) * w + Math.round(x + ux)];
@@ -56,7 +56,7 @@ export function findCenters(g: Gray, k = 6, maxPoints = 12000): CenterResult[] {
           const dy = qy - py;
           const d = Math.hypot(dx, dy);
           if (d < minD || d > maxD) continue;
-          // Her iki gradyan da kirişe göre aynı tarafa (içe ya da dışa) bakmalı
+          // Both gradients must point to the same side of the chord (both inward or both outward)
           const cp = (dx * pgx + dy * pgy) / d;
           const cq = -(dx * gx[j] + dy * gy[j]) / (d * mag[j]);
           if (Math.abs(cp) < 0.25 || cp * cq <= 0) continue;
@@ -81,7 +81,7 @@ export function findCenters(g: Gray, k = 6, maxPoints = 12000): CenterResult[] {
     if (work[best] <= 0) break;
     const bx = best % w;
     const by = (best - bx) / w;
-    // Alt-piksel: 5x5 ağırlık merkezi
+    // Sub-pixel: 5x5 centroid
     let sx = 0, sy = 0, sw = 0;
     for (let dy = -2; dy <= 2; dy++)
       for (let dx = -2; dx <= 2; dx++) {
@@ -91,7 +91,7 @@ export function findCenters(g: Gray, k = 6, maxPoints = 12000): CenterResult[] {
         sw += v;
       }
     out.push({ x: sx / sw, y: sy / sw, score: sm.data[best] / mean });
-    // Bastır
+    // Suppress
     const r = Math.ceil(sep);
     for (let y = Math.max(0, by - r); y < Math.min(h, by + r); y++)
       for (let x = Math.max(0, bx - r); x < Math.min(w, bx + r); x++)

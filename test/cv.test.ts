@@ -1,5 +1,5 @@
-// Kullanıcının örnek fotoğraflarıyla uçtan uca otomatik okuma (yerel; dosyalar ve araçlar yoksa atlanır).
-// 6 fotoğraf 10 s içinde çekildi: saatin sapması hepsinde aynı olmalı.
+// End-to-end auto-read on the sample photos (local only; skipped if the files or tools are missing).
+// The 6 photos were taken within 10 s: the watch drift must be the same in all of them.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,8 +21,8 @@ const has = (cmd: string) => {
 };
 const available = IDS.every((n) => existsSync(join(root, `IMG_${n}.HEIC`))) && has('heif-convert') && has('magick');
 
-describe.skipIf(!available)('otomatik okuma (örnek fotoğraflar)', () => {
-  it('tüm fotoğraflarda aynı sapma (±0,25 s)', async () => {
+describe.skipIf(!available)('auto-read (sample photos)', () => {
+  it('same drift in every photo (±0.25 s)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'wl-'));
     const drifts: number[] = [];
     for (const n of IDS) {

@@ -1,4 +1,4 @@
-// Örnek fotoğraflarda uçtan uca okuma; EXIF zamanına göre sapma ve tutarlılık.
+// End-to-end reading on sample photos; drift and consistency relative to EXIF time.
 import { readFileSync } from 'node:fs';
 import { downscale, fromU8 } from '../src/cv/image';
 import { readWatch } from '../src/cv/read';
@@ -25,11 +25,11 @@ for (const n of process.argv.slice(2)) {
     const drift = r.todSeconds - ref;
     drifts.push(drift);
     const tot = Object.values(r.diag.timings).reduce((a, b) => a + b, 0);
-    console.log(`${n} ref ${fmt(ref)}  saat ${fmt(r.todSeconds)}  sapma ${drift >= 0 ? '+' : ''}${drift.toFixed(2)} s  güven ${r.confidence.toFixed(2)}  ` +
+    console.log(`${n} ref ${fmt(ref)}  watch ${fmt(r.todSeconds)}  drift ${drift >= 0 ? '+' : ''}${drift.toFixed(2)} s  conf ${r.confidence.toFixed(2)}  ` +
       `ticks ${r.diag.ticksUsed} rms ${r.diag.tickRmsPx.toFixed(2)}px  sec σ ${(r.diag.secondsResidual * 1000).toFixed(2)}e-3 n=${r.diag.secondsPoints}  ` +
-      `akrep ${r.diag.hourResidualDeg.toFixed(2)}° yelk ${r.diag.minuteResidualDeg.toFixed(2)}° 12marj ${r.diag.orientMargin.toFixed(2)}  ${tot}ms ${r.warnings.join('; ')}`);
+      `hour ${r.diag.hourResidualDeg.toFixed(2)}° min ${r.diag.minuteResidualDeg.toFixed(2)}° 12margin ${r.diag.orientMargin.toFixed(2)}  ${tot}ms ${r.warnings.join('; ')}`);
     console.log('     ', r.diag.lines.map((l) => `${l.name}:${((l.phi * 180) / Math.PI).toFixed(1)}°`).join(' '), ` 12=${((r.diag.theta12 * 180) / Math.PI).toFixed(0)}°`);
-    // Görsel: düzleştirilmiş kadran + çizgiler
+    // Visual: rectified dial + detected lines
     const S = 1000, E = 1.1;
     const rect = rectify(full, r.dial.H, S, E);
     const u8 = new Uint8Array(S * S);
@@ -42,17 +42,17 @@ for (const n of process.argv.slice(2)) {
       const off = l.name === 'sec*' ? 0.02 : 0.012;
       for (let s = -0.3; s < 1.0; s += 0.004) {
         const nx = -Math.sin(l.phi), ny = Math.cos(l.phi);
-        if (i % 2 === 0 || l.name === 'sec*') put(nx * (l.d + off) + s * Math.cos(l.phi), ny * (l.d + off) + s * Math.sin(l.phi), l.name.startsWith('lüm') ? 255 : l.name === 'sec*' ? 0 : 128);
+        if (i % 2 === 0 || l.name === 'sec*') put(nx * (l.d + off) + s * Math.cos(l.phi), ny * (l.d + off) + s * Math.sin(l.phi), l.name.startsWith('lume') ? 255 : l.name === 'sec*' ? 0 : 128);
       }
     });
     for (let s = 0.3; s < 1.08; s += 0.004) put(s * Math.cos(r.diag.theta12), s * Math.sin(r.diag.theta12), 255);
     writeFileSync(`${process.env.OUT}/${n}-read.pgm`, Buffer.concat([Buffer.from(`P5\n${S} ${S}\n255\n`), Buffer.from(u8)]));
   } catch (e) {
-    console.log(`${n} HATA ${(e as Error).message}`);
+    console.log(`${n} ERROR ${(e as Error).message}`);
   }
 }
 if (drifts.length > 1) {
   const m = drifts.reduce((a, b) => a + b, 0) / drifts.length;
   const sd = Math.sqrt(drifts.reduce((a, b) => a + (b - m) ** 2, 0) / (drifts.length - 1));
-  console.log(`ortalama sapma ${m.toFixed(3)} s, std ${sd.toFixed(3)} s, aralık ${(Math.max(...drifts) - Math.min(...drifts)).toFixed(3)} s`);
+  console.log(`mean drift ${m.toFixed(3)} s, std ${sd.toFixed(3)} s, range ${(Math.max(...drifts) - Math.min(...drifts)).toFixed(3)} s`);
 }

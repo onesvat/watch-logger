@@ -1,4 +1,4 @@
-// Otomatik okuma: görüntüyü worker'a gönderir; sonuç için kaplama (overlay) çizer.
+// Auto-read: sends the image to the worker and draws the result overlay.
 
 import { applyH } from './cv/homography';
 import type { AutoOverlay, AutoRequest, AutoResponse, AutoResult } from './cv/protocol';
@@ -42,7 +42,7 @@ export function autoRead(
   });
 }
 
-/** Görüntü koordinatlarında kaplama: dakika halkası, 12 yönü, ibre çizgileri. `px` = 1 ekran pikseli. */
+/** Overlay in image coordinates: minute ring, 12 direction, hand lines. `px` = 1 screen pixel. */
 export function drawOverlay(ctx: CanvasRenderingContext2D, o: AutoOverlay, px: number) {
   const P = (u: number, v: number) => applyH(o.H, u, v);
   const poly = (pts: [number, number][], color: string, width: number) => {
@@ -54,13 +54,13 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, o: AutoOverlay, px: n
   };
   ctx.save();
   ctx.lineCap = 'round';
-  // Dakika çizgisi iç uçları çemberi
+  // Circle through the inner ends of the minute ticks
   poly(
     [...Array(241).keys()].map((i) => P(Math.cos((i / 240) * 2 * Math.PI), Math.sin((i / 240) * 2 * Math.PI))),
     'rgba(63,174,120,0.7)',
     1.5,
   );
-  // 12 yönü
+  // 12 direction
   const c12 = Math.cos(o.theta12);
   const s12 = Math.sin(o.theta12);
   poly([P(0.9 * c12, 0.9 * s12), P(1.08 * c12, 1.08 * s12)], '#d9a441', 4);
@@ -71,7 +71,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, o: AutoOverlay, px: n
     const ny = ux;
     const at = (s: number) => P(l.d * nx + s * ux, l.d * ny + s * uy);
     if (l.name === 'sec*') poly([at(-0.25), at(0.95)], '#ff4d6d', 1.5);
-    else poly([at(0.1), at(l.name === 'akrep' ? 0.55 : 0.85)], 'rgba(255,255,255,0.55)', 2);
+    else poly([at(0.1), at(l.name === 'hour' || l.name === 'akrep' ? 0.55 : 0.85)], 'rgba(255,255,255,0.55)', 2);
   }
   ctx.restore();
 }

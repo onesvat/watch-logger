@@ -10,8 +10,8 @@ export interface ExifTime {
 const PICK = ['DateTimeOriginal', 'SubSecTimeOriginal', 'OffsetTimeOriginal', 'Model'];
 
 /**
- * exifr yeni iPhone HEIC başlıklarını ("Unknown file format") tanımayabiliyor.
- * Bu durumda "Exif\0\0" + TIFF başlığını elle bulup yalnızca TIFF bloğunu çözeriz.
+ * exifr may not recognise recent iPhone HEIC headers ("Unknown file format").
+ * In that case we locate "Exif\0\0" + the TIFF header manually and parse only the TIFF block.
  */
 function findTiff(buf: Uint8Array): number {
   const exifMarker = [0x45, 0x78, 0x69, 0x66, 0, 0];
@@ -54,7 +54,7 @@ export function exifToMs(raw: Raw): ExifTime | null {
   const off = typeof raw.OffsetTimeOriginal === 'string' ? raw.OffsetTimeOriginal.trim() : '';
   const hasOffset = /^[+-]\d{2}:\d{2}$/.test(off);
   const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}${hasOffset ? off : ''}`;
-  const base = Date.parse(iso); // offset yoksa yerel saat olarak yorumlanır
+  const base = Date.parse(iso); // without an offset this is parsed as local time
   if (Number.isNaN(base)) return null;
   return {
     ms: base + Math.round(frac * 1000),

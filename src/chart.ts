@@ -1,4 +1,4 @@
-// Sapma–zaman grafiği (tek seri): noktalar + doğrusal uyum çizgisi, dokunarak/üzerine gelerek değer.
+// Drift-vs-time chart (single series): points + linear fit, value on tap/hover.
 
 import type { Fit, Sample } from './stats';
 import { fmtDate, fmtSigned, fmtTime } from './reading';
@@ -49,7 +49,7 @@ export function renderChart(el: HTMLElement, samples: Sample[], fit: Fit | null)
     return e;
   };
 
-  // Izgara + y ekseni etiketleri
+  // Grid + y-axis labels
   for (let v = yMin; v <= yMax + 1e-9; v += step) {
     const yy = y(v);
     const zero = Math.abs(v) < 1e-9;
@@ -63,7 +63,7 @@ export function renderChart(el: HTMLElement, samples: Sample[], fit: Fit | null)
     });
     add('text', { x: M.l - 6, y: yy + 4, 'text-anchor': 'end', 'font-size': 11, fill: '#95a198' }, Math.abs(v) < 1e-9 ? '0' : fmtSigned(v, step < 1 ? 1 : 0));
   }
-  // x ekseni: başlangıç ve bitiş tarihi
+  // x axis: start and end date
   add('text', { x: M.l, y: H - 6, 'font-size': 11, fill: '#95a198' }, fmtDate(t0));
   add('text', { x: W - M.r, y: H - 6, 'text-anchor': 'end', 'font-size': 11, fill: '#95a198' }, fmtDate(t1));
 

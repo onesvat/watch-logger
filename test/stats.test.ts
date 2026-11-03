@@ -5,7 +5,7 @@ const DAY = 86_400_000;
 const t0 = Date.UTC(2026, 8, 1);
 
 describe('linearFit', () => {
-  it('bilinen oranı bulur', () => {
+  it('recovers a known rate', () => {
     const s = [0, 1, 2, 3, 5].map((d) => ({ tTrue: t0 + d * DAY, drift: -3 + 1.8 * d }));
     const f = linearFit(s)!;
     expect(f.rate).toBeCloseTo(1.8, 9);
@@ -13,11 +13,11 @@ describe('linearFit', () => {
     expect(f.residualStd).toBeCloseTo(0, 9);
     expect(f.spanDays).toBe(5);
   });
-  it('tek nokta → null', () => expect(linearFit([{ tTrue: t0, drift: 1 }])).toBeNull());
+  it('single point → null', () => expect(linearFit([{ tTrue: t0, drift: 1 }])).toBeNull());
 });
 
 describe('segments', () => {
-  it('reset yeni seri başlatır', () => {
+  it('reset starts a new series', () => {
     const s = [
       { tTrue: t0, drift: 0 },
       { tTrue: t0 + DAY, drift: 2 },
@@ -29,7 +29,7 @@ describe('segments', () => {
 });
 
 describe('pairRates', () => {
-  it('yakın ölçümleri atlar', () => {
+  it('skips close measurements', () => {
     const s = [
       { tTrue: t0, drift: 0 },
       { tTrue: t0 + 3_600_000, drift: 0.1 },

@@ -1,4 +1,4 @@
-// Arka kamera akışı ve kare yakalama. Kare zamanı requestVideoFrameCallback metadata'sından alınır.
+// Rear camera stream and frame capture. Frame time comes from requestVideoFrameCallback metadata.
 
 interface FrameMeta {
   captureTime?: number;
@@ -14,7 +14,7 @@ export interface Capture {
   blob: Blob;
   width: number;
   height: number;
-  tDevice: number; // karenin cihaz saatine göre zamanı (epoch ms)
+  tDevice: number; // frame time by the device clock (epoch ms)
   timeSource: 'captureTime' | 'rvfc' | 'draw';
 }
 
@@ -41,7 +41,7 @@ export function stopCamera(video: HTMLVideoElement) {
   video.srcObject = null;
 }
 
-/** performance.now() zaman damgasını duvar saatine (Date.now ekseni) çevirir. */
+/** Converts a performance.now() timestamp to wall-clock time (Date.now axis). */
 function perfToWall(perfT: number): number {
   return Date.now() - (performance.now() - perfT);
 }
@@ -55,12 +55,12 @@ function drawFrame(video: HTMLVideoElement): HTMLCanvasElement {
 }
 
 async function toBlob(c: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('toBlob başarısız'))), 'image/jpeg', 0.92));
+  return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('toBlob failed'))), 'image/jpeg', 0.92));
 }
 
 /**
- * Bir sonraki kareyi yakalar. rVFC geri çağrısında çizilen kare, metadata'sı bilinen karedir.
- * captureTime (sensör zamanı) varsa o, yoksa geri çağrının `now` değeri kullanılır.
+ * Captures the next frame. The frame drawn inside the rVFC callback is the one whose metadata we know.
+ * Uses captureTime (sensor time) when available, otherwise the callback's `now`.
  */
 export async function captureFrame(video: HTMLVideoElement): Promise<Capture> {
   const rvfc = (video as unknown as { requestVideoFrameCallback?: RVFC }).requestVideoFrameCallback?.bind(video);

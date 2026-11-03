@@ -1,12 +1,12 @@
-// Cihaz saatinin UTC'ye göre ofseti (Cristian algoritması).
-// offset = gerçekZaman − Date.now()  →  gerçekZaman = Date.now() + offset
+// Offset of the device clock relative to UTC (Cristian's algorithm).
+// offset = trueTime − Date.now()  →  trueTime = Date.now() + offset
 
 export interface SyncResult {
   offsetMs: number;
-  errMs: number; // ± belirsizlik (en iyi örneğin RTT/2'si)
+  errMs: number; // ± uncertainty (RTT/2 of the best sample)
   rttMs: number;
   samples: number;
-  at: number; // ölçüm anı (Date.now)
+  at: number; // measurement time (Date.now)
   server: string;
 }
 
@@ -19,23 +19,23 @@ async function sample(): Promise<{ offset: number; rtt: number }> {
   const text = await res.text();
   const p1 = performance.now();
   const server = parseFloat(text) * 1000;
-  if (!Number.isFinite(server)) throw new Error(`Geçersiz sunucu cevabı: ${text}`);
+  if (!Number.isFinite(server)) throw new Error(`Invalid server response: ${text}`);
   const rtt = p1 - p0;
-  // Sunucu zamanı ms'ye kesilmiş gelir → ortalama +0,5 ms.
+  // Server time is truncated to ms → add 0.5 ms on average.
   return { offset: server + 0.5 - (wall0 + rtt / 2), rtt };
 }
 
 export async function syncClock(n = 8): Promise<SyncResult> {
-  await sample().catch(() => undefined); // DNS/TLS ısınması, sonucu atılır
+  await sample().catch(() => undefined); // DNS/TLS warm-up, result discarded
   const results: { offset: number; rtt: number }[] = [];
   for (let i = 0; i < n; i++) {
     try {
       results.push(await sample());
     } catch {
-      /* tek örnek hatası önemsiz */
+      /* a single failed sample is fine */
     }
   }
-  if (results.length === 0) throw new Error('Zaman sunucusuna ulaşılamadı');
+  if (results.length === 0) throw new Error('Time server unreachable');
   results.sort((a, b) => a.rtt - b.rtt);
   const best = results[0];
   return {

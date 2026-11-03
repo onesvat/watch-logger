@@ -159,6 +159,9 @@ input {
   text-decoration: none;
   cursor: pointer;
 }
+.btn[hidden] {
+  display: none;
+}
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -490,7 +493,7 @@ input {
   justify-self: end;
 }
 
-/* Saati kur */
+/* Set the watch */
 #view-set {
   bottom: 0;
 }

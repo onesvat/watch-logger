@@ -1,4 +1,4 @@
-// Fotoğraf görüntüleyici: sürükle, iki parmakla yakınlaştır, çift dokunuşla 3× büyüt, fare tekerleği.
+// Photo viewer: drag, pinch to zoom, double-tap for 3×, mouse wheel.
 
 export class Viewer {
   private ctx: CanvasRenderingContext2D;
@@ -8,7 +8,7 @@ export class Viewer {
   private ty = 0;
   private pointers = new Map<number, { x: number; y: number }>();
   private lastTap = 0;
-  private touched = false; // kullanıcı yakınlaştırdı/kaydırdı mı
+  private touched = false; // has the user zoomed/panned
   private overlay: ((ctx: CanvasRenderingContext2D, px: number) => void) | null = null;
   private ro: ResizeObserver;
 
@@ -24,7 +24,7 @@ export class Viewer {
     this.ro.observe(canvas);
   }
 
-  /** Görüntü koordinatlarında çizilen kaplama; `px` = bir ekran pikselinin görüntü pikseli karşılığı. */
+  /** Overlay drawn in image coordinates; `px` = size of one screen pixel in image pixels. */
   setOverlay(fn: ((ctx: CanvasRenderingContext2D, px: number) => void) | null) {
     this.overlay = fn;
     this.draw();
@@ -119,7 +119,7 @@ export class Viewer {
     const d0 = Math.hypot(prev.x - other.x, prev.y - other.y);
     const d1 = Math.hypot(cur.x - other.x, cur.y - other.y);
     this.pointers.set(e.pointerId, cur);
-    // Orta nokta kaydırması + yakınlaştırma
+    // Midpoint pan + zoom
     this.tx += (cur.x - prev.x) / 2;
     this.ty += (cur.y - prev.y) / 2;
     if (d0 > 0) this.zoomAt((cur.x + other.x) / 2, (cur.y + other.y) / 2, d1 / d0);

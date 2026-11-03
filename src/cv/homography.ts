@@ -1,6 +1,6 @@
-// Çok noktalı homografi (normalize DLT, en küçük kareler) ve IRLS ile aykırı değerlere dayanıklı uydurma.
+// Multi-point homography (normalised DLT, least squares) and outlier-robust fitting with IRLS.
 
-export type H3 = number[]; // 3x3 satır öncelikli
+export type H3 = number[]; // 3x3 row-major
 
 export function applyH(h: H3, x: number, y: number): [number, number] {
   const w = h[6] * x + h[7] * y + h[8];
@@ -35,7 +35,7 @@ function solve(A: number[][], b: number[]): number[] {
     let p = c;
     for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
     [M[c], M[p]] = [M[p], M[c]];
-    if (Math.abs(M[c][c]) < 1e-15) throw new Error('tekil sistem');
+    if (Math.abs(M[c][c]) < 1e-15) throw new Error('singular system');
     for (let r = c + 1; r < n; r++) {
       const f = M[r][c] / M[c][c];
       for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
@@ -60,7 +60,7 @@ function normalizer(pts: [number, number][], wts: number[]): H3 {
   return [s, 0, -s * mx, 0, s, -s * my, 0, 0, 1];
 }
 
-/** src → dst homografisi, ağırlıklı en küçük kareler (h33 = 1). */
+/** src → dst homography, weighted least squares (h33 = 1). */
 export function fitH(src: [number, number][], dst: [number, number][], wts = src.map(() => 1)): H3 {
   const Ts = normalizer(src, wts);
   const Td = normalizer(dst, wts);
@@ -85,14 +85,14 @@ export function fitH(src: [number, number][], dst: [number, number][], wts = src
   return H.map((v) => v / H[8]);
 }
 
-/** Belirleyici sözde-rastgele üreteç (tekrarlanabilir sonuç için). */
+/** Deterministic pseudo-random generator (for reproducible results). */
 function lcg(seed: number) {
   let s = seed >>> 0;
   return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
 }
 
 /**
- * RANSAC (4 nokta) + inlier'larla en küçük kareler. `thr` dst biriminde inlier eşiği.
+ * RANSAC (4 points) + least squares on inliers. `thr` = inlier threshold in dst units.
  */
 export function fitHRansac(
   src: [number, number][],
@@ -140,7 +140,7 @@ export function fitHRansac(
   return { H, inliers, residuals: resid(H) };
 }
 
-/** Huber ağırlıklı IRLS; artıklar dst biriminde. */
+/** Huber-weighted IRLS; residuals in dst units. */
 export function fitHRobust(
   src: [number, number][],
   dst: [number, number][],

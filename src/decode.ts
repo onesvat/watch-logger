@@ -1,4 +1,4 @@
-// Görüntü çözme. HEIC'i tarayıcı açamıyorsa (Safari dışı) heic-to (güncel libheif) ile JPEG'e çevirir.
+// Image decoding. If the browser cannot open HEIC (non-Safari), converts it to JPEG with heic-to (recent libheif).
 
 export async function decodeImage(blob: Blob): Promise<{ bitmap: ImageBitmap; jpeg: Blob }> {
   try {
