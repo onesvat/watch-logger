@@ -1,0 +1,33 @@
+node_modules
+dist
+*.local
+
+# Kişisel fotoğraflar ve örnek veriler (EXIF'te konum olabilir)
+*.HEIC
+*.heic
+*.HEIF
+*.heif
+*.jpg
+*.jpeg
+*.JPG
+*.JPEG
+*.dng
+*.DNG
+*.raw
+samples/
+raw/
+
+# Dışa aktarılan ölçümler
+*.csv
+
+# Gizli bilgiler ve sertifikalar
+.env
+.env.*
+*.pem
+*.key
+*.crt
+
+# Editör / sistem
+.DS_Store
+.vscode/
+.idea/
