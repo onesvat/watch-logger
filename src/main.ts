@@ -546,6 +546,7 @@ $('list').addEventListener('click', async (ev) => {
 // ---------- Settings ----------
 
 async function renderSettings() {
+  renderDisplayInfo();
   renderSync(sync ? 'ok' : 'err');
   $<HTMLInputElement>('datepos-input').value = String(datePosition);
   $<HTMLInputElement>('latency-input').value = latencyMs.toFixed(0);
@@ -553,6 +554,22 @@ async function renderSettings() {
   $('latency-samples').textContent = samples.length
     ? `Samples: ${samples.map((s) => s.latencyMs.toFixed(0)).join(', ')} ms`
     : 'No calibration samples yet (assuming 0 ms).';
+}
+
+/** Safe-area and viewport numbers, to tune the layout under the iOS status bar. */
+function renderDisplayInfo() {
+  const probe = document.createElement('div');
+  probe.style.cssText =
+    'position:fixed;visibility:hidden;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)';
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const top = cs.paddingTop;
+  const bottom = cs.paddingBottom;
+  probe.remove();
+  const standalone = matchMedia('(display-mode: standalone)').matches;
+  $('display-info').textContent =
+    `safe top ${top} · safe bottom ${bottom} · viewport ${innerWidth}×${innerHeight} · ` +
+    `screen ${screen.width}×${screen.height} · standalone ${standalone ? 'yes' : 'no'}`;
 }
 
 $('sync-now').addEventListener('click', () => void doSync());
