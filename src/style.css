@@ -26,10 +26,17 @@ body {
   margin: 0;
   height: 100%;
   background: var(--bg);
+  overscroll-behavior: none;
+}
+/* iOS standalone can leave the home-indicator strip outside the CSS viewport; it is painted with the
+   root background, so give the root the nav colour and keep the page itself on --bg. */
+html {
+  background: var(--surface);
+}
+body {
   color: var(--text);
   font: 15px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior: none;
 }
 
 button,
@@ -50,6 +57,10 @@ input {
 #view-entry,
 #view-ref {
   bottom: 0;
+}
+#view-entry {
+  padding-top: env(safe-area-inset-top, 0px);
+  background: #000;
 }
 
 .bar {
@@ -429,6 +440,16 @@ input {
   grid-template-columns: repeat(3, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
+}
+/* Extend the bar's colour below the viewport edge in case iOS shows anything past it. */
+.nav::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 120px;
+  background: var(--surface);
 }
 .nav a {
   display: grid;
