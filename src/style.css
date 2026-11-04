@@ -13,6 +13,8 @@
   --neg: #6fb3e6;
   --nav-h: 50px;
   /* Keep most of the home-indicator inset but not all of it: the full 34 px leaves a visible gap. */
+  /* iOS 26 fades the status bar a little past the reported inset. */
+  --safe-t: calc(env(safe-area-inset-top, 0px) + 12px);
   --safe-b: max(0px, calc(env(safe-area-inset-bottom, 0px) - 14px));
   color-scheme: dark;
 }
@@ -59,7 +61,7 @@ input {
   bottom: 0;
 }
 #view-entry {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--safe-t);
   background: #000;
 }
 
@@ -67,7 +69,7 @@ input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
+  padding: calc(var(--safe-t) + 10px) 16px 10px;
 }
 .title {
   font-size: 20px;
@@ -523,7 +525,7 @@ input {
   justify-content: center;
   align-items: center;
   gap: 10px;
-  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(16px + var(--safe-b));
+  padding: calc(var(--safe-t) + 16px) 16px calc(16px + var(--safe-b));
   background: #000;
   text-align: center;
   transition: background 0.25s ease-out;
